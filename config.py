@@ -1,6 +1,7 @@
 import os
 from typing import Optional
 
+
 class Config:
     BASE_URL: str = "https://ruscorpora.ru/api/v1"
     _RNC_TOKEN: Optional[str] = os.getenv("RNC_API_TOKEN")
