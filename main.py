@@ -1,17 +1,13 @@
 from fastmcp import FastMCP, Context
-from rnc_mcp.schemas.llm import SearchQuery
-from rnc_mcp.services.builder import RNCQueryBuilder
-from rnc_mcp.services.formatter import ResponseFormatter
-from rnc_mcp.client import RNCClient
-from rnc_mcp.config import Config
+from schemas.llm import SearchQuery
+from services.builder import RNCQueryBuilder
+from services.formatter import ResponseFormatter
+from client import RNCClient
+from config import Config
 
 
 # Initialize FastMCP
-mcp = FastMCP(
-    "Russian National Corpus Agent",
-    dependencies=["httpx", "pydantic"],
-    description="Agent for searching the Russian National Corpus (RNC)."
-)
+mcp = FastMCP("Russian National Corpus Agent")
 
 # Instantiate services
 client = RNCClient()

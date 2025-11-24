@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-from rnc_mcp.schemas.llm import SearchQuery, TokenRequest
+from schemas.llm import SearchQuery, TokenRequest
 
 
 class RNCQueryBuilder:

@@ -1,6 +1,6 @@
 import httpx
 from typing import Dict, Any
-from rnc_mcp.config import Config
+from config import Config
 
 
 class RNCClient:
