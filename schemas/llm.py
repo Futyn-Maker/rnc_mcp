@@ -1,5 +1,7 @@
-from typing import List, Optional, Literal
+from typing import List, Optional
 from pydantic import BaseModel, Field
+
+# Request Models
 
 
 class TokenRequest(BaseModel):
@@ -13,7 +15,6 @@ class TokenRequest(BaseModel):
     gramm: Optional[str] = Field(
         None, description="Grammar tags separated by comma (e.g., 'S,m,anim')."
     )
-    # Distance is relative to the PREVIOUS token in the list
     dist_min: int = Field(1, description="Min distance from previous word.")
     dist_max: int = Field(1, description="Max distance from previous word.")
 
@@ -25,8 +26,40 @@ class DateFilter(BaseModel):
 
 class SearchQuery(BaseModel):
     """The main input model for the search tool."""
-    corpus: Literal["MAIN", "PAPER", "POETIC", "SPOKEN"] = "MAIN"
-    tokens: List[TokenRequest] = Field(..., min_length=1, description="List of words to find in sequence.")
-    date_range: Optional[DateFilter] = Field(None, description="Filter by creation date.")
+    corpus: str = Field(
+        "MAIN",
+        description="Corpus type (e.g., MAIN, PAPER). See rnc://corpora.")
+    tokens: List[TokenRequest] = Field(...,
+                                       min_length=1,
+                                       description="List of words to find in sequence.")
+    date_range: Optional[DateFilter] = Field(
+        None, description="Filter by creation date.")
     page: int = Field(0, description="Page number (0-indexed).")
     per_page: int = Field(10, description="Results per page.")
+
+# Response Models
+
+
+class SnippetMetadata(BaseModel):
+    title: str
+    author: Optional[str] = None
+    date: Optional[str] = None
+    doc_id: str
+
+
+class SearchResultItem(BaseModel):
+    metadata: SnippetMetadata
+    text: str = Field(...,
+                      description="Formatted text with **hits** highlighted.")
+
+
+class PaginationInfo(BaseModel):
+    current_page: int
+    total_pages: int
+    total_documents: int
+
+
+class RNCResponse(BaseModel):
+    """Structured response for RNC search results."""
+    pagination: PaginationInfo
+    results: List[SearchResultItem]
