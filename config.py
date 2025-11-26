@@ -8,10 +8,6 @@ class Config:
 
     @classmethod
     def get_token(cls) -> str:
-        """
-        Retrieves the token or raises a descriptive error if missing.
-        This ensures the LLM gets a clear 'ToolError' explaining the prerequisite.
-        """
         if not cls._RNC_TOKEN:
             raise ValueError(
                 "RNC_API_TOKEN is not set. Please generate a token at "
