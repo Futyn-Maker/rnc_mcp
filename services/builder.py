@@ -39,7 +39,7 @@ class RNCQueryBuilder:
                     token.dist_min, token.dist_max)
                 conditions.append(dist_cond)
 
-            if conditions:  # Only add if there are constraints
+            if conditions:
                 subsection_values.append({
                     "conditionValues": conditions
                 })
@@ -51,12 +51,14 @@ class RNCQueryBuilder:
                     {"subsectionValues": subsection_values}
                 ]
             },
-            "pagination": {
-                "page": query.page,
-                "docsPerPage": query.per_page,
-                "snippetsPerDoc": 1
-            },
-            "sort": "random"
+            "params": {
+                "pageParams": {
+                    "page": query.page,
+                    "docsPerPage": query.per_page,
+                    "snippetsPerDoc": 10
+                },
+                "sort": "grcreated"
+            }
         }
 
         if query.date_range:
@@ -78,7 +80,10 @@ class RNCQueryBuilder:
 
             if has_date:
                 subcorpus_conditions.append(date_cond)
-                payload["subcorpus"] = {"sectionValues": [
-                    {"conditionValues": subcorpus_conditions}]}
+                payload["subcorpus"] = {
+                    "sectionValues": [
+                        {"conditionValues": subcorpus_conditions}
+                    ]
+                }
 
         return payload

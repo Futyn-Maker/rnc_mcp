@@ -8,114 +8,107 @@ from config import Config
 
 mcp = FastMCP(
     "Russian National Corpus Agent",
-    dependencies=["httpx", "pydantic"]
-)
-
+    dependencies=[
+        "httpx",
+        "pydantic"])
 client = RNCClient()
 
 
-@mcp.resource("rnc://corpora")
-def get_available_corpora() -> str:
+@mcp.resource("rnc://{corpus}/info")
+async def get_corpus_info(corpus: str) -> str:
     """
-    Returns a Markdown list of valid corpus types supported by the API.
-    Use these values in the 'corpus' field of search queries.
-    """
-    corpora = [
-        "MAIN (Main Corpus)",
-        "PAPER (Newspaper Corpus)",
-        "POETIC (Poetic Corpus)",
-        "SPOKEN (Spoken Corpus)",
-        "DIALECT (Dialect Corpus)",
-        "REGIONAL (Regional Corpus)",
-        "SCHOOL (Educational Corpus)",
-        "PARALLEL (Parallel Corpus - requires 'lang')",
-    ]
-    return "# Available RNC Corpora\n\n" + \
-        "\n".join([f"- {c}" for c in corpora])
-
-
-@mcp.resource("rnc://tags")
-async def get_grammar_tags() -> str:
-    """
-    Returns a Markdown representation of valid grammatical attributes (POS, Case, Gender, etc.).
-    Use these codes in the 'gramm' field of search queries.
+    Returns configuration and grammatical tags for a specific corpus.
+    Use this to discover valid Sort options, Filter fields, and Grammar tags.
     """
     try:
-        # Validate auth before call
         Config.get_token()
 
-        raw_data = await client.get_grammar_attributes()
+        # Fetch Data
+        config_data = await client.get_corpus_config(corpus)
+        gramm_data = await client.get_grammar_attributes(corpus)
 
-        # Format the messy JSON tree into a clean Markdown list
-        output = ["# RNC Grammar Tags\n"]
+        output = [f"# Configuration for {corpus}\n"]
 
-        vals = raw_data.get("vals", [])
-        if not vals:
-            return "No attributes found in response."
+        # Sorting
+        output.append("## Available Sorting Methods")
+        sortings = config_data.get("sortings", [])
+        valid_sorts = [
+            s for s in sortings
+            if "CONCORDANCE" in s.get("applicableTo", [])
+        ]
 
-        # Recursive helper to print options
-        def format_options(options, indent=0):
+        for s in valid_sorts:
+            name = s.get("name")
+            readable = s.get("humanReadable")
+            line = f"- `{name}`"
+            if readable:
+                line += f" ({readable})"
+            output.append(line)
+
+        # Filters
+        output.append("\n## Filter Fields")
+        stats_fields = config_data.get("statFields", [])
+        for f in stats_fields:
+            output.append(f"- `{f}`")
+
+        # Grammar Tags
+        output.append("\n## Grammar Tags (attr: 'gramm')")
+
+        def format_options(options, level=0):
             res = ""
-            prefix = "  " * indent + "- "
+            indent = "  " * level
             for opt in options:
-                title = opt.get("title", "Untitled")
-                value = opt.get("value", None)
-
-                line = f"{prefix}**{title}**"
-                if value:
-                    line += f" (`{value}`)"
-                res += line + "\n"
-
-                # Handle nested options or suboptions
+                title = opt.get("title")
+                val = opt.get("value")
                 sub = opt.get("suboptions", {}).get("options", [])
+
                 if sub:
-                    res += format_options(sub, indent + 1)
+                    res += f"\n{indent}- **{title}**\n"
+                    res += format_options(sub, level + 1)
+                elif val:
+                    res += f"{indent}- `{val}` ({title})\n"
             return res
 
-        # Root level iteration
+        vals = gramm_data.get("vals", [])
         for val in vals:
-            options_root = val.get(
+            root_options = val.get(
                 "valOptions",
                 {}).get(
                 "v",
                 {}).get(
                 "options",
                 [])
-            output.append(format_options(options_root))
+            output.append(format_options(root_options))
 
-        return "".join(output)
+        return "\n".join(output)
 
     except Exception as e:
-        return f"Error fetching tags: {str(e)}"
+        return f"Error loading resource for {corpus}: {str(e)}"
 
 
 @mcp.tool
 async def search_rnc(query: SearchQuery, ctx: Context) -> RNCResponse:
     """
     Performs a lexicographic search in the Russian National Corpus.
-    Returns structured JSON with metadata and highlighted text.
+    Returns statistics and a list of documents with examples.
     """
-    # Validate Auth
     try:
         Config.get_token()
     except ValueError as e:
         raise RuntimeError(str(e))
 
-    await ctx.info(f"Searching RNC: {len(query.tokens)} tokens in {query.corpus}")
+    await ctx.info(f"Searching {query.corpus}...")
 
-    # Build
     try:
         payload = RNCQueryBuilder.build_payload(query)
     except Exception as e:
         raise RuntimeError(f"Query Build Error: {str(e)}")
 
-    # Execute
     try:
         raw_result = await client.execute_search(payload)
     except Exception as e:
         raise RuntimeError(f"API Execution Error: {str(e)}")
 
-    # Format
     try:
         formatted_response = ResponseFormatter.format_search_results(
             raw_result)

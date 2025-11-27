@@ -1,11 +1,16 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
 
-# Request Models
+
+RncCorpusType = Literal[
+    "MAIN", "SYNTAX", "PAPER", "REGIONAL", "PARA", "MULTI", "SCHOOL",
+    "DIALECT", "POETIC", "SPOKEN", "ACCENT", "MURCO", "MULTIPARC_RUS",
+    "MULTIPARC", "OLD_RUS", "BIRCHBARK", "MID_RUS", "ORTHLIB", "PANCHRON",
+    "KIDS", "CLASSICS", "BLOGS", "EPIGRAPHICA"
+]
 
 
 class TokenRequest(BaseModel):
-    """Represents a single word in the search sequence."""
     lemma: Optional[str] = Field(
         None, description="The dictionary form of the word (e.g., 'бежать')."
     )
@@ -13,8 +18,8 @@ class TokenRequest(BaseModel):
         None, description="The exact word form (e.g., 'бежал')."
     )
     gramm: Optional[str] = Field(
-        None, description="Grammar tags separated by comma (e.g., 'S,m,anim')."
-    )
+        None,
+        description="Grammar tags (e.g., 'S').")
     dist_min: int = Field(1, description="Min distance from previous word.")
     dist_max: int = Field(1, description="Max distance from previous word.")
 
@@ -25,41 +30,45 @@ class DateFilter(BaseModel):
 
 
 class SearchQuery(BaseModel):
-    """The main input model for the search tool."""
-    corpus: str = Field(
+    corpus: RncCorpusType = Field(
         "MAIN",
-        description="Corpus type (e.g., MAIN, PAPER). See rnc://corpora.")
-    tokens: List[TokenRequest] = Field(...,
-                                       min_length=1,
-                                       description="List of words to find in sequence.")
+        description="Corpus to search in.")
+    tokens: List[TokenRequest] = Field(
+        ...,
+        min_length=1,
+        description="Sequence of words to find."
+    )
     date_range: Optional[DateFilter] = Field(
-        None, description="Filter by creation date.")
+        None, description="Filter by creation date."
+    )
     page: int = Field(0, description="Page number (0-indexed).")
-    per_page: int = Field(10, description="Results per page.")
-
-# Response Models
+    per_page: int = Field(10, description="Documents per page.")
 
 
-class SnippetMetadata(BaseModel):
+class DocMetadata(BaseModel):
     title: str
     author: Optional[str] = None
-    date: Optional[str] = None
-    doc_id: str
+    year: Optional[str] = None
 
 
-class SearchResultItem(BaseModel):
-    metadata: SnippetMetadata
-    text: str = Field(...,
-                      description="Formatted text with **hits** highlighted.")
+class DocumentItem(BaseModel):
+    metadata: DocMetadata
+    examples: List[str] = Field(...,
+                                description="List of text fragments found in the document.")
 
 
-class PaginationInfo(BaseModel):
-    current_page: int
-    total_pages: int
-    total_documents: int
+class StatValues(BaseModel):
+    textCount: Optional[int] = None
+    wordUsageCount: Optional[int] = None
+
+
+class GlobalStats(BaseModel):
+    corpusStats: Optional[StatValues] = None
+    subcorpStats: Optional[StatValues] = None
+    queryStats: Optional[StatValues] = None
+    total_pages_available: int
 
 
 class RNCResponse(BaseModel):
-    """Structured response for RNC search results."""
-    pagination: PaginationInfo
-    results: List[SearchResultItem]
+    stats: GlobalStats
+    results: List[DocumentItem]
