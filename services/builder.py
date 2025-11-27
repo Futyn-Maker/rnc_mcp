@@ -56,8 +56,7 @@ class RNCQueryBuilder:
                     "page": query.page,
                     "docsPerPage": query.per_page,
                     "snippetsPerDoc": 10
-                },
-                "sort": "grcreated"
+                }
             }
         }
 
