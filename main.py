@@ -4,6 +4,7 @@ from services.builder import RNCQueryBuilder
 from services.formatter import ResponseFormatter
 from client import RNCClient
 from config import Config
+from resources.generator import CorpusResourceGenerator
 
 
 mcp = FastMCP(
@@ -12,78 +13,30 @@ mcp = FastMCP(
         "httpx",
         "pydantic"])
 client = RNCClient()
+resource_generator = CorpusResourceGenerator(client)
 
 
-@mcp.resource("rnc://{corpus}/info")
-async def get_corpus_info(corpus: str) -> str:
+def register_corpus_resources():
     """
-    Returns configuration and grammatical tags for a specific corpus.
-    Use this to discover valid Sort options, Filter fields, and Grammar tags.
+    Registers a static resource for each corpus defined in Config.
+    The resource URI is rnc://{CODE}/info.
     """
-    try:
-        Config.get_token()
+    # Factory function to create a handler with the captured corpus code
+    def create_handler(corpus_code: str):
+        async def handler() -> str:
+            return await resource_generator.generate(corpus_code)
+        return handler
 
-        # Fetch Data
-        config_data = await client.get_corpus_config(corpus)
-        gramm_data = await client.get_grammar_attributes(corpus)
+    for code, desc in Config.CORPORA.items():
+        uri = f"rnc://{code}/info"
+        name = f"{desc}: Info"
 
-        output = [f"# Configuration for {corpus}\n"]
+        # Register programmatically
+        mcp.resource(uri, name=name)(create_handler(code))
 
-        # Sorting
-        output.append("## Available Sorting Methods")
-        sortings = config_data.get("sortings", [])
-        valid_sorts = [
-            s for s in sortings
-            if "CONCORDANCE" in s.get("applicableTo", [])
-        ]
 
-        for s in valid_sorts:
-            name = s.get("name")
-            readable = s.get("humanReadable")
-            line = f"- `{name}`"
-            if readable:
-                line += f" ({readable})"
-            output.append(line)
-
-        # Filters
-        output.append("\n## Filter Fields")
-        stats_fields = config_data.get("statFields", [])
-        for f in stats_fields:
-            output.append(f"- `{f}`")
-
-        # Grammar Tags
-        output.append("\n## Grammar Tags (attr: 'gramm')")
-
-        def format_options(options, level=0):
-            res = ""
-            indent = "  " * level
-            for opt in options:
-                title = opt.get("title")
-                val = opt.get("value")
-                sub = opt.get("suboptions", {}).get("options", [])
-
-                if sub:
-                    res += f"\n{indent}- **{title}**\n"
-                    res += format_options(sub, level + 1)
-                elif val:
-                    res += f"{indent}- `{val}` ({title})\n"
-            return res
-
-        vals = gramm_data.get("vals", [])
-        for val in vals:
-            root_options = val.get(
-                "valOptions",
-                {}).get(
-                "v",
-                {}).get(
-                "options",
-                [])
-            output.append(format_options(root_options))
-
-        return "\n".join(output)
-
-    except Exception as e:
-        return f"Error loading resource for {corpus}: {str(e)}"
+# Initialize resources on startup
+register_corpus_resources()
 
 
 @mcp.tool
@@ -115,6 +68,7 @@ async def search_rnc(query: SearchQuery, ctx: Context) -> RNCResponse:
         return formatted_response
     except Exception as e:
         raise RuntimeError(f"Response Formatting Error: {str(e)}")
+
 
 if __name__ == "__main__":
     mcp.run(transport="http")

@@ -1,13 +1,18 @@
-from typing import List, Optional, Literal
+from typing import List, Optional
+from enum import Enum
 from pydantic import BaseModel, Field
+from config import Config
 
 
-RncCorpusType = Literal[
-    "MAIN", "SYNTAX", "PAPER", "REGIONAL", "PARA", "MULTI", "SCHOOL",
-    "DIALECT", "POETIC", "SPOKEN", "ACCENT", "MURCO", "MULTIPARC_RUS",
-    "MULTIPARC", "OLD_RUS", "BIRCHBARK", "MID_RUS", "ORTHLIB", "PANCHRON",
-    "KIDS", "CLASSICS", "BLOGS", "EPIGRAPHICA"
-]
+RncCorpusType = Enum(
+    'RncCorpusType',
+    {code: code for code in Config.CORPORA.keys()},
+    type=str
+)
+
+_corpus_options_doc = "\n".join(
+    [f"- `{code}`: {desc}" for code, desc in Config.CORPORA.items()]
+)
 
 
 class TokenRequest(BaseModel):
@@ -31,8 +36,8 @@ class DateFilter(BaseModel):
 
 class SearchQuery(BaseModel):
     corpus: RncCorpusType = Field(
-        "MAIN",
-        description="Corpus to search in.")
+        RncCorpusType.MAIN,
+        description=f"Corpus to search in. Available options:\n{_corpus_options_doc}")
     tokens: List[TokenRequest] = Field(
         ...,
         min_length=1,

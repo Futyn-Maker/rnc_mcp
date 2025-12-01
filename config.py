@@ -1,10 +1,26 @@
 import os
-from typing import Optional
+from typing import Optional, Dict
 
 
 class Config:
     BASE_URL: str = "https://ruscorpora.ru/api/v1"
     _RNC_TOKEN: Optional[str] = os.getenv("RNC_API_TOKEN")
+
+    CORPORA: Dict[str, str] = {
+        "MAIN": "Main",
+        "PAPER": "Media (newspapers)",
+        "POETIC": "Poetry",
+        "SPOKEN": "Spoken",
+        "DIALECT": "Dialect",
+        "SCHOOL": "Educational",
+        "SYNTAX": "SynTagRus",
+        "MULTI": "Multimedia",
+        "ACCENT": "Accentological",
+        "MULTIPARC": "MultiPARC",
+        "KIDS": "From 2 to 15",
+        "CLASSICS": "Russian classics",
+        "BLOGS": "Social networks"
+    }
 
     @classmethod
     def get_token(cls) -> str:
