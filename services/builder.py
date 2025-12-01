@@ -68,6 +68,9 @@ class RNCQueryBuilder:
             }
         }
 
+        if query.sort:
+            payload["params"]["sort"] = query.sort
+
         if query.date_range:
             subcorpus_conditions = []
             date_cond = {

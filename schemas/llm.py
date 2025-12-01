@@ -46,6 +46,10 @@ class SearchQuery(BaseModel):
     date_range: Optional[DateFilter] = Field(
         None, description="Filter by creation date."
     )
+    sort: Optional[str] = Field(
+        None,
+        description="Sort order (e.g., 'grcreated')."
+    )
     page: int = Field(0, description="Page number (0-indexed).")
     per_page: int = Field(10, description="Documents per page.")
 
