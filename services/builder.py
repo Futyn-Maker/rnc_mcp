@@ -12,7 +12,7 @@ class RNCQueryBuilder:
 
         if token.wordform:
             conditions.append(
-                {"fieldName": "word", "text": {"v": token.wordform}})
+                {"fieldName": "form", "text": {"v": token.wordform}})
 
         if token.gramm:
             conditions.append(
@@ -44,18 +44,26 @@ class RNCQueryBuilder:
                     "conditionValues": conditions
                 })
 
+        global_conditions = [
+            {"fieldName": "disambmod", "text": {"v": "main"}},
+            {"fieldName": "distmod", "text": {"v": "with_zeros"}}
+        ]
+
         payload = {
             "corpus": {"type": query.corpus},
             "lexGramm": {
                 "sectionValues": [
-                    {"subsectionValues": subsection_values}
+                    {
+                        "conditionValues": global_conditions,
+                        "subsectionValues": subsection_values
+                    }
                 ]
             },
             "params": {
                 "pageParams": {
                     "page": query.page,
                     "docsPerPage": query.per_page,
-                    "snippetsPerDoc": 10
+                    "snippetsPerDoc": 50
                 }
             }
         }
@@ -70,11 +78,17 @@ class RNCQueryBuilder:
             has_date = False
             if query.date_range.start_year:
                 date_cond["dateRange"]["begin"] = {
-                    "year": query.date_range.start_year}
+                    "year": query.date_range.start_year,
+                    "month": 1,
+                    "day": 1
+                }
                 has_date = True
             if query.date_range.end_year:
                 date_cond["dateRange"]["end"] = {
-                    "year": query.date_range.end_year}
+                    "year": query.date_range.end_year,
+                    "month": 12,
+                    "day": 31
+                }
                 has_date = True
 
             if has_date:
