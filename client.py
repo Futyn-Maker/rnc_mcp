@@ -9,7 +9,7 @@ class RNCClient:
         self.timeout = httpx.Timeout(30.0, connect=10.0)
 
     async def execute_search(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             try:
                 response = await client.post(
                     f"{Config.BASE_URL}/lex-gramm/concordance",
@@ -27,10 +27,10 @@ class RNCClient:
                         e.response.text}")
 
     async def get_corpus_config(self, corpus_type: str) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
-                f"{Config.BASE_URL}/config",
+                f"{Config.BASE_URL}/config/",
                 params=params,
                 headers=Config.headers()
             )
@@ -38,7 +38,7 @@ class RNCClient:
             return response.json()
 
     async def get_grammar_attributes(self, corpus_type: str) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
                 f"{Config.BASE_URL}/attrs/gr",
