@@ -1,5 +1,5 @@
-from typing import Any, Dict, List
-from schemas.llm import SearchQuery, TokenRequest
+from typing import Any, Dict, List, Optional
+from schemas.schemas import SearchQuery, TokenRequest, SubcorpusFilter, DateFilter
 
 
 class RNCQueryBuilder:
@@ -26,6 +26,96 @@ class RNCQueryBuilder:
             "fieldName": "dist",
             "intRange": {"begin": dist_min, "end": dist_max}
         }
+
+    @staticmethod
+    def _build_date_range_condition(
+        date_range: DateFilter
+    ) -> Optional[Dict[str, Any]]:
+        """Build a date range condition for document creation date."""
+        date_cond = {
+            "fieldName": "created",
+            "dateRange": {"matching": "INT_RANGE_INTERSECT"}
+        }
+
+        has_date = False
+        if date_range.start_year:
+            date_cond["dateRange"]["begin"] = {
+                "year": date_range.start_year,
+                "month": 1,
+                "day": 1
+            }
+            has_date = True
+        if date_range.end_year:
+            date_cond["dateRange"]["end"] = {
+                "year": date_range.end_year,
+                "month": 12,
+                "day": 31
+            }
+            has_date = True
+
+        return date_cond if has_date else None
+
+    @staticmethod
+    def _build_subcorpus_conditions(
+        subcorpus: SubcorpusFilter
+    ) -> List[Dict[str, Any]]:
+        """Build subcorpus filtering conditions."""
+        conditions = []
+
+        # Disambiguation (tagging)
+        if subcorpus.disambiguation:
+            conditions.append({
+                "fieldName": "tagging",
+                "text": {"v": subcorpus.disambiguation}
+            })
+
+        # Document title (header)
+        if subcorpus.title:
+            conditions.append({
+                "fieldName": "header",
+                "text": {"v": subcorpus.title}
+            })
+
+        # Document creation date
+        if subcorpus.date_range:
+            date_cond = RNCQueryBuilder._build_date_range_condition(
+                subcorpus.date_range
+            )
+            if date_cond:
+                conditions.append(date_cond)
+
+        # Author name
+        if subcorpus.author:
+            conditions.append({
+                "fieldName": "author",
+                "text": {"v": subcorpus.author}
+            })
+
+        # Author gender (sex)
+        if subcorpus.author_gender:
+            gender_value = "муж" if subcorpus.author_gender == "male" else "жен"
+            conditions.append({
+                "fieldName": "sex",
+                "text": {"v": gender_value}
+            })
+
+        # Author birth year
+        if subcorpus.author_birthyear_range:
+            birthyear_range = subcorpus.author_birthyear_range
+            if birthyear_range.start_year or birthyear_range.end_year:
+                birth_cond = {
+                    "fieldName": "birthday",
+                    "intRange": {"matching": "INT_RANGE_INTERSECT"}
+                }
+                if birthyear_range.start_year:
+                    birth_cond["intRange"]["begin"] = (
+                        birthyear_range.start_year
+                    )
+                if birthyear_range.end_year:
+                    birth_cond["intRange"]["end"] = birthyear_range.end_year
+                conditions.append(birth_cond)
+
+        return conditions
 
     @classmethod
     def build_payload(cls, query: SearchQuery) -> Dict[str, Any]:
@@ -71,31 +161,11 @@ class RNCQueryBuilder:
         if query.sort:
             payload["params"]["sort"] = query.sort
 
-        if query.date_range:
-            subcorpus_conditions = []
-            date_cond = {
-                "fieldName": "created",
-                "dateRange": {"matching": "INT_RANGE_INTERSECT"}
-            }
-
-            has_date = False
-            if query.date_range.start_year:
-                date_cond["dateRange"]["begin"] = {
-                    "year": query.date_range.start_year,
-                    "month": 1,
-                    "day": 1
-                }
-                has_date = True
-            if query.date_range.end_year:
-                date_cond["dateRange"]["end"] = {
-                    "year": query.date_range.end_year,
-                    "month": 12,
-                    "day": 31
-                }
-                has_date = True
-
-            if has_date:
-                subcorpus_conditions.append(date_cond)
+        if query.subcorpus:
+            subcorpus_conditions = cls._build_subcorpus_conditions(
+                query.subcorpus
+            )
+            if subcorpus_conditions:
                 payload["subcorpus"] = {
                     "sectionValues": [
                         {"conditionValues": subcorpus_conditions}

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 from enum import Enum
 from pydantic import BaseModel, Field
 from config import Config
@@ -34,17 +34,44 @@ class DateFilter(BaseModel):
     end_year: Optional[int] = None
 
 
+class SubcorpusFilter(BaseModel):
+    author: Optional[str] = Field(
+        None, description="Filter by author name (e.g., 'Пушкин')."
+    )
+    title: Optional[str] = Field(
+        None,
+        description="Filter by document title (e.g., 'Евгений Онегин')."
+    )
+    date_range: Optional[DateFilter] = Field(
+        None, description="Filter by document creation date."
+    )
+    author_gender: Optional[Literal["male", "female"]] = Field(
+        None, description="Filter by author gender."
+    )
+    author_birthyear_range: Optional[DateFilter] = Field(
+        None, description="Filter by author's birth year range."
+    )
+    disambiguation: Optional[Literal["auto", "manual"]] = Field(
+        None,
+        description="Homonymy disambiguation mode (auto or manual tagging)."
+    )
+
+
 class SearchQuery(BaseModel):
     corpus: RncCorpusType = Field(
         RncCorpusType.MAIN,
-        description=f"Corpus to search in. Available options:\n{_corpus_options_doc}")
+        description=(
+            f"Corpus to search in. Available options:\n"
+            f"{_corpus_options_doc}"
+        )
+    )
     tokens: List[TokenRequest] = Field(
         ...,
         min_length=1,
         description="Sequence of words to find."
     )
-    date_range: Optional[DateFilter] = Field(
-        None, description="Filter by creation date."
+    subcorpus: Optional[SubcorpusFilter] = Field(
+        None, description="Subcorpus filtering options."
     )
     sort: Optional[str] = Field(
         None,
@@ -78,6 +105,6 @@ class GlobalStats(BaseModel):
     total_pages_available: int
 
 
-class RNCResponse(BaseModel):
+class ConcordanceResponse(BaseModel):
     stats: GlobalStats
     results: List[DocumentItem]
