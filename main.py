@@ -1,5 +1,5 @@
 from fastmcp import FastMCP, Context
-from schemas.llm import SearchQuery, RNCResponse
+from schemas.schemas import SearchQuery, ConcordanceResponse
 from services.builder import RNCQueryBuilder
 from services.formatter import ResponseFormatter
 from client import RNCClient
@@ -8,10 +8,7 @@ from resources.generator import CorpusResourceGenerator
 
 
 mcp = FastMCP(
-    "Russian National Corpus Agent",
-    dependencies=[
-        "httpx",
-        "pydantic"])
+    "Russian National Corpus")
 client = RNCClient()
 resource_generator = CorpusResourceGenerator(client)
 
@@ -40,7 +37,7 @@ register_corpus_resources()
 
 
 @mcp.tool
-async def search_rnc(query: SearchQuery, ctx: Context) -> RNCResponse:
+async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
     """
     Performs a lexicographic search in the Russian National Corpus.
     Returns statistics and a list of documents with examples.
@@ -58,7 +55,7 @@ async def search_rnc(query: SearchQuery, ctx: Context) -> RNCResponse:
         raise RuntimeError(f"Query Build Error: {str(e)}")
 
     try:
-        raw_result = await client.execute_search(payload)
+        raw_result = await client.execute_concordance(payload)
     except Exception as e:
         raise RuntimeError(f"API Execution Error: {str(e)}")
 

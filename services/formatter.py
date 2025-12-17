@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional
-from schemas.llm import RNCResponse, DocumentItem, DocMetadata, GlobalStats, StatValues
+from schemas.schemas import ConcordanceResponse, DocumentItem, DocMetadata, GlobalStats, StatValues
 
 
 class ResponseFormatter:
@@ -59,7 +59,8 @@ class ResponseFormatter:
         return "".join(text_builder)
 
     @staticmethod
-    def format_search_results(raw_response: Dict[str, Any]) -> RNCResponse:
+    def format_search_results(
+            raw_response: Dict[str, Any]) -> ConcordanceResponse:
         pagination = raw_response.get("pagination", {})
         total_pages = pagination.get("totalPageCount", 0)
 
@@ -106,4 +107,4 @@ class ResponseFormatter:
                             metadata=metadata,
                             examples=examples))
 
-        return RNCResponse(stats=global_stats, results=results)
+        return ConcordanceResponse(stats=global_stats, results=results)

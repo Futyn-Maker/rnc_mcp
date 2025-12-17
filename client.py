@@ -8,7 +8,8 @@ class RNCClient:
     def __init__(self):
         self.timeout = httpx.Timeout(30.0, connect=10.0)
 
-    async def execute_search(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_concordance(
+            self, payload: Dict[str, Any]) -> Dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             try:
                 response = await client.post(
