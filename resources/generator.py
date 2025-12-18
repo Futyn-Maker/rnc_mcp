@@ -9,7 +9,7 @@ class CorpusResourceGenerator:
     async def generate(self, corpus: str) -> str:
         """
         Generates a Markdown description of the corpus configuration,
-        including sorting methods, filters, and all attribute types.
+        including sorting methods and all attribute types.
         """
         try:
             Config.get_token()
@@ -37,15 +37,6 @@ class CorpusResourceGenerator:
                     if readable:
                         line += f" ({readable})"
                     output.append(line)
-
-            # Filters
-            output.append("\n## Filter Fields")
-            stats_fields = config_data.get("statFields", [])
-            if not stats_fields:
-                output.append("_No filter fields available._")
-            else:
-                for f in stats_fields:
-                    output.append(f"- `{f}`")
 
             # Fetch all attribute types
             attr_types = [
