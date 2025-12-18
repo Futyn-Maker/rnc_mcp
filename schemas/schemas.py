@@ -96,6 +96,13 @@ class SearchQuery(BaseModel):
     per_page: int = Field(
         10, description="Documents per page."
     )
+    return_examples: bool = Field(
+        True,
+        description=(
+            "Whether to return examples with results. "
+            "If False, only statistics are returned."
+        )
+    )
 
 
 class DocMetadata(BaseModel):

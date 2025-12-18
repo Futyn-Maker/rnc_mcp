@@ -155,6 +155,14 @@ class RNCQueryBuilder:
             {"fieldName": "distmod", "text": {"v": "with_zeros"}}
         ]
 
+        # Use minimal pagination if not returning examples
+        if query.return_examples:
+            docs_per_page = query.per_page
+            snippets_per_doc = 50
+        else:
+            docs_per_page = 1
+            snippets_per_doc = 1
+
         payload = {
             "corpus": {"type": query.corpus},
             "lexGramm": {
@@ -167,9 +175,9 @@ class RNCQueryBuilder:
             },
             "params": {
                 "pageParams": {
-                    "page": query.page,
-                    "docsPerPage": query.per_page,
-                    "snippetsPerDoc": 50
+                    "page": 0 if not query.return_examples else query.page,
+                    "docsPerPage": docs_per_page,
+                    "snippetsPerDoc": snippets_per_doc
                 }
             }
         }

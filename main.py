@@ -40,7 +40,7 @@ register_corpus_resources()
 async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
     """
     Performs a lexicographic search in the Russian National Corpus.
-    Returns statistics and a list of documents with examples.
+    Returns statistics and optionally a list of documents with examples.
     """
     try:
         Config.get_token()
@@ -62,6 +62,11 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
     try:
         formatted_response = ResponseFormatter.format_search_results(
             raw_result)
+
+        # Clear results if user only wants statistics
+        if not query.return_examples:
+            formatted_response.results = []
+
         return formatted_response
     except Exception as e:
         raise RuntimeError(f"Response Formatting Error: {str(e)}")
