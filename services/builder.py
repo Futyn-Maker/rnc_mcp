@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Optional
-from schemas.schemas import SearchQuery, TokenRequest, SubcorpusFilter, DateFilter
+from schemas.schemas import (
+    SearchQuery, TokenRequest, SubcorpusFilter, DateFilter
+)
 
 
 class RNCQueryBuilder:
@@ -17,6 +19,18 @@ class RNCQueryBuilder:
         if token.gramm:
             conditions.append(
                 {"fieldName": "gramm", "text": {"v": token.gramm}})
+
+        if token.semantic:
+            conditions.append(
+                {"fieldName": "sem", "text": {"v": token.semantic}})
+
+        if token.syntax:
+            conditions.append(
+                {"fieldName": "syntax", "text": {"v": token.syntax}})
+
+        if token.flags:
+            conditions.append(
+                {"fieldName": "flags", "text": {"v": token.flags}})
 
         return conditions
 
@@ -93,7 +107,9 @@ class RNCQueryBuilder:
 
         # Author gender (sex)
         if subcorpus.author_gender:
-            gender_value = "муж" if subcorpus.author_gender == "male" else "жен"
+            gender_value = (
+                "муж" if subcorpus.author_gender == "male" else "жен"
+            )
             conditions.append({
                 "fieldName": "sex",
                 "text": {"v": gender_value}

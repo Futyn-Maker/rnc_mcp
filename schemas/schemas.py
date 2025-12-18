@@ -24,7 +24,20 @@ class TokenRequest(BaseModel):
     )
     gramm: Optional[str] = Field(
         None,
-        description="Grammar tags (e.g., 'S').")
+        description="Grammar tags (e.g., 'S')."
+    )
+    semantic: Optional[str] = Field(
+        None,
+        description="Semantic tags (e.g., 't:hum')."
+    )
+    syntax: Optional[str] = Field(
+        None,
+        description="Syntactic tags (e.g., 'clause_main')."
+    )
+    flags: Optional[str] = Field(
+        None,
+        description="Additional feature flags (e.g., 'lexred')."
+    )
     dist_min: int = Field(1, description="Min distance from previous word.")
     dist_max: int = Field(1, description="Max distance from previous word.")
 
@@ -58,8 +71,8 @@ class SubcorpusFilter(BaseModel):
 
 
 class SearchQuery(BaseModel):
-    corpus: RncCorpusType = Field(
-        RncCorpusType.MAIN,
+    corpus: RncCorpusType = Field(  # type: ignore
+        RncCorpusType.MAIN,  # type: ignore
         description=(
             f"Corpus to search in. Available options:\n"
             f"{_corpus_options_doc}"
@@ -77,8 +90,12 @@ class SearchQuery(BaseModel):
         None,
         description="Sort order (e.g., 'grcreated')."
     )
-    page: int = Field(0, description="Page number (0-indexed).")
-    per_page: int = Field(10, description="Documents per page.")
+    page: int = Field(
+        0, description="Page number (0-indexed)."
+    )
+    per_page: int = Field(
+        10, description="Documents per page."
+    )
 
 
 class DocMetadata(BaseModel):

@@ -38,11 +38,22 @@ class RNCClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_grammar_attributes(self, corpus_type: str) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+    async def get_attributes(
+        self, corpus_type: str, attr_type: str
+    ) -> Dict[str, Any]:
+        """
+        Fetch attributes for a corpus.
+
+        Args:
+            corpus_type: The corpus type (e.g., 'MAIN')
+            attr_type: The attribute type ('gr', 'sem', 'syntax', 'flags')
+        """
+        async with httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=True
+        ) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
-                f"{Config.BASE_URL}/attrs/gr",
+                f"{Config.BASE_URL}/attrs/{attr_type}",
                 params=params,
                 headers=Config.headers()
             )

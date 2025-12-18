@@ -9,14 +9,13 @@ class CorpusResourceGenerator:
     async def generate(self, corpus: str) -> str:
         """
         Generates a Markdown description of the corpus configuration,
-        including sorting methods, filters, and grammatical tags.
+        including sorting methods, filters, and all attribute types.
         """
         try:
             Config.get_token()
 
             # Fetch Data
             config_data = await self.client.get_corpus_config(corpus)
-            gramm_data = await self.client.get_grammar_attributes(corpus)
 
             output = [f"# Configuration for {corpus}\n"]
 
@@ -48,22 +47,36 @@ class CorpusResourceGenerator:
                 for f in stats_fields:
                     output.append(f"- `{f}`")
 
-            # Grammar Tags
-            output.append("\n## Grammar Tags (attr: 'gramm')")
+            # Fetch all attribute types
+            attr_types = [
+                ("gr", "Grammar Tags (attr: 'gramm')"),
+                ("sem", "Semantic Tags (attr: 'semantic')"),
+                ("syntax", "Syntax Tags (attr: 'syntax')"),
+                ("flags", "Additional Flags (attr: 'flags')")
+            ]
 
-            vals = gramm_data.get("vals", [])
-            if not vals:
-                output.append("_No grammar tags found._")
-            else:
-                for val in vals:
-                    root_options = val.get(
-                        "valOptions",
-                        {}).get(
-                        "v",
-                        {}).get(
-                        "options",
-                        [])
-                    output.append(self._format_options(root_options))
+            for attr_type, title in attr_types:
+                try:
+                    attr_data = await self.client.get_attributes(
+                        corpus, attr_type
+                    )
+                    output.append(f"\n## {title}")
+
+                    vals = attr_data.get("vals", [])
+                    if not vals:
+                        output.append(f"_No {attr_type} tags found._")
+                    else:
+                        for val in vals:
+                            root_options = val.get(
+                                "valOptions",
+                                {}).get(
+                                "v",
+                                {}).get(
+                                "options",
+                                [])
+                            output.append(self._format_options(root_options))
+                except Exception:
+                    output.append(f"_No {attr_type} tags available._")
 
             return "\n".join(output)
 
@@ -71,6 +84,11 @@ class CorpusResourceGenerator:
             return f"Error loading resource for {corpus}: {str(e)}"
 
     def _format_options(self, options, level=0) -> str:
+        """
+        Format attribute options into markdown.
+        Handles nested structures where nodes can have both values
+        and suboptions.
+        """
         res = ""
         indent = "  " * level
         for opt in options:
@@ -78,9 +96,18 @@ class CorpusResourceGenerator:
             val = opt.get("value")
             sub = opt.get("suboptions", {}).get("options", [])
 
-            if sub:
-                res += f"\n{indent}- **{title}**\n"
+            if val and sub:
+                # Node has both value and suboptions
+                res += f"{indent}- `{val}` (**{title}**)\n"
                 res += self._format_options(sub, level + 1)
             elif val:
+                # Node has only value (leaf node)
                 res += f"{indent}- `{val}` ({title})\n"
+            elif sub:
+                # Node has only suboptions (category header)
+                res += f"\n{indent}- **{title}**\n"
+                res += self._format_options(sub, level + 1)
+            else:
+                # Node has only title (shouldn't happen normally)
+                res += f"{indent}- {title}\n"
         return res
