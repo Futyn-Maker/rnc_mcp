@@ -1,5 +1,5 @@
-from client import RNCClient
-from config import Config
+from rnc_mcp.client import RNCClient
+from rnc_mcp.config import Config
 
 
 class CorpusResourceGenerator:

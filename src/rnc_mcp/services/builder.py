@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional
-from schemas.schemas import (
+from rnc_mcp.schemas.schemas import (
     SearchQuery, TokenRequest, SubcorpusFilter, DateFilter
 )
 

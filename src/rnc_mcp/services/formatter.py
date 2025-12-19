@@ -1,5 +1,5 @@
 from typing import Dict, Any, List, Optional
-from schemas.schemas import ConcordanceResponse, DocumentItem, DocMetadata, GlobalStats, StatValues
+from rnc_mcp.schemas.schemas import ConcordanceResponse, DocumentItem, DocMetadata, GlobalStats, StatValues
 
 
 class ResponseFormatter:

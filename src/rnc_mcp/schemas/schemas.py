@@ -1,7 +1,7 @@
 from typing import List, Optional, Literal
 from enum import Enum
 from pydantic import BaseModel, Field
-from config import Config
+from rnc_mcp.config import Config
 
 
 RncCorpusType = Enum(

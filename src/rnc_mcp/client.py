@@ -1,7 +1,7 @@
 import httpx
 import json
 from typing import Dict, Any
-from config import Config
+from rnc_mcp.config import Config
 
 
 class RNCClient:
