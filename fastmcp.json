@@ -1,0 +1,22 @@
+{
+  "$schema": "https://gofastmcp.com/public/schemas/fastmcp.json/v1.json",
+  "source": {
+    "type": "filesystem",
+    "path": "main.py",
+    "entrypoint": "mcp"
+  },
+  "environment": {
+    "type": "uv",
+    "python": ">=3.13",
+    "requirements": "requirements.txt"
+  },
+  "deployment": {
+    "transport": "http",
+    "host": "127.0.0.1",
+    "port": 8000,
+    "log_level": "INFO",
+    "env": {
+      "RNC_API_TOKEN": "${RNC_API_TOKEN}"
+    }
+  }
+}
