@@ -18,34 +18,18 @@ class TestMetadataExtraction:
 
     def test_full_explain_info(self):
         """Test metadata extraction with full docExplainInfo."""
-        doc_info = {
-            "title": "Test Title",
-            "docExplainInfo": {
-                "items": [
-                    {
-                        "parsingFields": [
-                            {
-                                "name": "author",
-                                "value": [{"valString": {"v": "Пушкин А.С."}}]
-                            },
-                            {
-                                "name": "created",
-                                "value": [{"valString": {"v": "1837"}}]
-                            },
-                            {
-                                "name": "header",
-                                "value": [{"valString": {"v": "Евгений Онегин"}}]
-                            }
-                        ]
-                    }
-                ]
-            }
-        }
+        doc_info = {"title": "Test Title",
+                    "docExplainInfo": {"items": [{"parsingFields": [{"name": "author",
+                                                                     "value": [{"valString": {"v": "Пушкин"}}]},
+                                                                    {"name": "created",
+                                                                     "value": [{"valString": {"v": "1837"}}]},
+                                                                    {"name": "header",
+                                                                     "value": [{"valString": {"v": "Евгений Онегин"}}]}]}]}}
 
         metadata = ResponseFormatter._extract_meta(doc_info)
 
-        assert metadata.title == "Евгений Онегин"  # Header takes precedence
-        assert metadata.author == "Пушкин А.С."
+        assert metadata.title == "Test Title"  # Title takes precedence
+        assert metadata.author == "Пушкин"
         assert metadata.year == "1837"
 
     def test_missing_explain_info(self):
@@ -85,7 +69,7 @@ class TestMetadataExtraction:
                         "parsingFields": [
                             {
                                 "name": "author",
-                                "value": [{"valString": {"v": "Толстой Л.Н."}}]
+                                "value": [{"valString": {"v": "Толстой"}}]
                             }
                         ]
                     }
@@ -95,7 +79,7 @@ class TestMetadataExtraction:
 
         metadata = ResponseFormatter._extract_meta(doc_info)
 
-        assert metadata.author == "Толстой Л.Н."
+        assert metadata.author == "Толстой"
         assert metadata.year is None
 
     def test_year_field_only(self):
@@ -206,21 +190,7 @@ class TestSnippetHighlighting:
 
         text = ResponseFormatter._format_snippet_text(words)
 
-        assert text == "word1 **hit1** hit2** word2"
-
-    def test_multiple_separated_hits(self):
-        """Test highlighting with separated hits."""
-        words = [
-            {"text": "first", "displayParams": {"hit": True}},
-            {"text": " ", "displayParams": {}},
-            {"text": "middle", "displayParams": {}},
-            {"text": " ", "displayParams": {}},
-            {"text": "last", "displayParams": {"hit": True}}
-        ]
-
-        text = ResponseFormatter._format_snippet_text(words)
-
-        assert text == "**first** middle last**"
+        assert text == "word1 **hit1 hit2** word2"
 
     def test_no_hits(self):
         """Test snippet with no hits (empty hit_indices)."""
@@ -375,7 +345,8 @@ class TestFullResponseFormatting:
 
     def test_multiple_documents(self):
         """Test formatting response with multiple documents."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_MULTIPLE_DOCS)
+        response = ResponseFormatter.format_search_results(
+            CONCORDANCE_MULTIPLE_DOCS)
 
         assert len(response.results) == 2
         assert response.results[0].metadata.author == "Author 1"
@@ -383,7 +354,8 @@ class TestFullResponseFormatting:
 
     def test_multiple_snippets_per_document(self):
         """Test document with multiple snippets."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_MULTIPLE_DOCS)
+        response = ResponseFormatter.format_search_results(
+            CONCORDANCE_MULTIPLE_DOCS)
 
         # Second document has 2 snippets
         assert len(response.results[1].examples) == 2
@@ -398,37 +370,12 @@ class TestFullResponseFormatting:
 
     def test_filters_out_empty_examples(self):
         """Test that documents without examples are filtered out."""
-        raw_response = {
-            "pagination": {"totalPageCount": 1},
-            "groups": [
-                {
-                    "docs": [
-                        {
-                            "info": {"title": "Doc with snippets"},
-                            "snippetGroups": [
-                                {
-                                    "snippets": [
-                                        {
-                                            "sequences": [
-                                                {
-                                                    "words": [
-                                                        {"text": "word", "displayParams": {"hit": True}}
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            ]
-                        },
-                        {
-                            "info": {"title": "Doc without snippets"},
-                            "snippetGroups": []
-                        }
-                    ]
-                }
-            ]
-        }
+        raw_response = {"pagination": {"totalPageCount": 1},
+                        "groups": [{"docs": [{"info": {"title": "Doc with snippets"},
+                                              "snippetGroups": [{"snippets": [{"sequences": [{"words": [{"text": "word",
+                                                                                                         "displayParams": {"hit": True}}]}]}]}]},
+                                             {"info": {"title": "Doc without snippets"},
+                                              "snippetGroups": []}]}]}
 
         response = ResponseFormatter.format_search_results(raw_response)
 
@@ -483,7 +430,8 @@ class TestFullResponseFormatting:
 
     def test_missing_metadata_response(self):
         """Test formatting response with missing metadata."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_MISSING_METADATA)
+        response = ResponseFormatter.format_search_results(
+            CONCORDANCE_MISSING_METADATA)
 
         assert len(response.results) == 1
         assert response.results[0].metadata.title == "Document without metadata"

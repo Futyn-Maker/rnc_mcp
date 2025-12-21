@@ -10,23 +10,26 @@ from pathlib import Path
 src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-from rnc_mcp.client import RNCClient
-from rnc_mcp.config import Config
+# fmt: off
+from rnc_mcp.client import RNCClient  # noqa: E402
+from rnc_mcp.config import Config  # noqa: E402
 from tests.fixtures.mock_responses import (
     CONCORDANCE_SUCCESS,
     CONCORDANCE_EMPTY,
     CORPUS_CONFIG_MAIN,
     ATTRIBUTES_GRAMMAR,
-)
+)  # noqa: E402
 from tests.fixtures.sample_queries import (
     SIMPLE_LEMMA_QUERY,
     COMPLEX_QUERY_WITH_SUBCORPUS,
     STATISTICS_ONLY_QUERY,
-)
+)  # noqa: E402
+# fmt: on
 
 # ==============================================================================
 # Environment Fixtures
 # ==============================================================================
+
 
 @pytest.fixture(scope="session")
 def real_api_token():
@@ -61,6 +64,7 @@ def clear_env_token(monkeypatch):
 # ==============================================================================
 # Client Fixtures
 # ==============================================================================
+
 
 @pytest.fixture
 def mock_rnc_client():

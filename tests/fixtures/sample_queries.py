@@ -39,7 +39,7 @@ COMPLEX_QUERY_WITH_SUBCORPUS = SearchQuery(
     ],
     subcorpus=SubcorpusFilter(
         author="Пушкин",
-        date_range=DateFilter(start_year=1830, end_year=1840),
+        date_range=DateFilter(start_year=1810, end_year=1837),
         author_gender="male"
     ),
     sort="grcreated",
@@ -65,7 +65,7 @@ QUERY_WITH_SYNTAX = SearchQuery(
     corpus=RncCorpusType.MAIN,
     tokens=[
         TokenRequest(syntax="root"),
-        TokenRequest(syntax="nsubj", dist_min=0, dist_max=5)
+        TokenRequest(syntax="nsubj", dist_min=1, dist_max=5)
     ]
 )
 
@@ -84,7 +84,6 @@ QUERY_WITH_ALL_TOKEN_FIELDS = SearchQuery(
             lemma="идти",
             wordform="идёт",
             gramm="V",
-            semantic="t:hum",
             syntax="root",
             flags="capital"
         )
@@ -202,7 +201,7 @@ QUERY_WIDE_DISTANCE = SearchQuery(
     corpus=RncCorpusType.MAIN,
     tokens=[
         TokenRequest(lemma="очень"),
-        TokenRequest(lemma="красивый", dist_min=0, dist_max=5)
+        TokenRequest(lemma="красивый", dist_min=1, dist_max=5)
     ]
 )
 

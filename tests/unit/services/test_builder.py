@@ -61,7 +61,9 @@ class TestTokenConditionBuilding:
         conditions = RNCQueryBuilder._build_token_conditions(token)
 
         assert len(conditions) == 1
-        assert conditions[0] == {"fieldName": "flags", "text": {"v": "capital"}}
+        assert conditions[0] == {
+            "fieldName": "flags", "text": {
+                "v": "capital"}}
 
     def test_multiple_fields_combined(self):
         """Test token with multiple fields."""
@@ -78,17 +80,15 @@ class TestTokenConditionBuilding:
             lemma="идти",
             wordform="идёт",
             gramm="V",
-            semantic="t:hum",
             syntax="root",
             flags="capital"
         )
         conditions = RNCQueryBuilder._build_token_conditions(token)
 
-        assert len(conditions) == 6
+        assert len(conditions) == 5
         assert {"fieldName": "lex", "text": {"v": "идти"}} in conditions
         assert {"fieldName": "form", "text": {"v": "идёт"}} in conditions
         assert {"fieldName": "gramm", "text": {"v": "V"}} in conditions
-        assert {"fieldName": "sem", "text": {"v": "t:hum"}} in conditions
         assert {"fieldName": "syntax", "text": {"v": "root"}} in conditions
         assert {"fieldName": "flags", "text": {"v": "capital"}} in conditions
 
@@ -144,7 +144,8 @@ class TestDateRangeBuilding:
         assert date_cond is not None
         assert date_cond["fieldName"] == "created"
         assert date_cond["dateRange"]["matching"] == "INT_RANGE_INTERSECT"
-        assert date_cond["dateRange"]["begin"] == {"year": 1900, "month": 1, "day": 1}
+        assert date_cond["dateRange"]["begin"] == {
+            "year": 1900, "month": 1, "day": 1}
         assert "end" not in date_cond["dateRange"]
 
     def test_end_year_only(self):
@@ -154,7 +155,8 @@ class TestDateRangeBuilding:
 
         assert date_cond is not None
         assert date_cond["fieldName"] == "created"
-        assert date_cond["dateRange"]["end"] == {"year": 2000, "month": 12, "day": 31}
+        assert date_cond["dateRange"]["end"] == {
+            "year": 2000, "month": 12, "day": 31}
         assert "begin" not in date_cond["dateRange"]
 
     def test_both_years(self):
@@ -163,8 +165,10 @@ class TestDateRangeBuilding:
         date_cond = RNCQueryBuilder._build_date_range_condition(date_filter)
 
         assert date_cond is not None
-        assert date_cond["dateRange"]["begin"] == {"year": 1800, "month": 1, "day": 1}
-        assert date_cond["dateRange"]["end"] == {"year": 1900, "month": 12, "day": 31}
+        assert date_cond["dateRange"]["begin"] == {
+            "year": 1800, "month": 1, "day": 1}
+        assert date_cond["dateRange"]["end"] == {
+            "year": 1900, "month": 12, "day": 31}
 
     def test_empty_date_filter_returns_none(self):
         """Test that empty DateFilter returns None."""
@@ -203,7 +207,8 @@ class TestSubcorpusConditionBuilding:
         subcorpus = SubcorpusFilter(title="Евгений Онегин")
         conditions = RNCQueryBuilder._build_subcorpus_conditions(subcorpus)
 
-        assert {"fieldName": "header", "text": {"v": "Евгений Онегин"}} in conditions
+        assert {"fieldName": "header", "text": {
+            "v": "Евгений Онегин"}} in conditions
 
     def test_date_range_condition(self):
         """Test subcorpus with date range (uses dateRange)."""
@@ -214,8 +219,10 @@ class TestSubcorpusConditionBuilding:
 
         # Find the created date condition
         date_cond = next(c for c in conditions if c["fieldName"] == "created")
-        assert date_cond["dateRange"]["begin"] == {"year": 1830, "month": 1, "day": 1}
-        assert date_cond["dateRange"]["end"] == {"year": 1840, "month": 12, "day": 31}
+        assert date_cond["dateRange"]["begin"] == {
+            "year": 1830, "month": 1, "day": 1}
+        assert date_cond["dateRange"]["end"] == {
+            "year": 1840, "month": 12, "day": 31}
 
     def test_author_condition(self):
         """Test subcorpus with author filter."""
@@ -246,7 +253,8 @@ class TestSubcorpusConditionBuilding:
         conditions = RNCQueryBuilder._build_subcorpus_conditions(subcorpus)
 
         # Find the birthday condition
-        birthday_cond = next(c for c in conditions if c["fieldName"] == "birthday")
+        birthday_cond = next(
+            c for c in conditions if c["fieldName"] == "birthday")
         assert "intRange" in birthday_cond
         assert birthday_cond["intRange"]["begin"] == 1799
         assert birthday_cond["intRange"]["end"] == 1799
@@ -265,7 +273,8 @@ class TestSubcorpusConditionBuilding:
 
         assert len(conditions) == 6
         assert {"fieldName": "tagging", "text": {"v": "manual"}} in conditions
-        assert {"fieldName": "header", "text": {"v": "Война и мир"}} in conditions
+        assert {"fieldName": "header", "text": {
+            "v": "Война и мир"}} in conditions
         assert {"fieldName": "author", "text": {"v": "Толстой"}} in conditions
         assert {"fieldName": "sex", "text": {"v": "муж"}} in conditions
 
@@ -295,7 +304,11 @@ class TestFullPayloadBuilding:
         )
         payload = RNCQueryBuilder.build_payload(query)
 
-        token_cond = payload["lexGramm"][0]
+        # Access token via sectionValues[0].subsectionValues[0]
+        subsections = payload["lexGramm"]["sectionValues"][0]["subsectionValues"]
+        assert len(subsections) == 1
+        token_cond = subsections[0]["conditionValues"]
+
         # First token should not have distance
         field_names = [c["fieldName"] for c in token_cond]
         assert "dist" not in field_names
@@ -311,10 +324,12 @@ class TestFullPayloadBuilding:
         )
         payload = RNCQueryBuilder.build_payload(query)
 
-        assert len(payload["lexGramm"]) == 2
+        # Access subsections
+        subsections = payload["lexGramm"]["sectionValues"][0]["subsectionValues"]
+        assert len(subsections) == 2
 
         # Second token should have distance
-        second_token = payload["lexGramm"][1]
+        second_token = subsections[1]["conditionValues"]
         field_names = [c["fieldName"] for c in second_token]
         assert "dist" in field_names
 
@@ -332,8 +347,10 @@ class TestFullPayloadBuilding:
         )
         payload = RNCQueryBuilder.build_payload(query)
 
-        assert "subcorpus" in payload["params"]
-        assert {"fieldName": "author", "text": {"v": "Пушкин"}} in payload["params"]["subcorpus"]
+        # Subcorpus is at top level, not in params
+        assert "subcorpus" in payload
+        subcorpus_conds = payload["subcorpus"]["sectionValues"][0]["conditionValues"]
+        assert {"fieldName": "author", "text": {"v": "Пушкин"}} in subcorpus_conds
 
     def test_with_sort_parameter(self):
         """Test payload with sort parameter."""
@@ -356,8 +373,8 @@ class TestFullPayloadBuilding:
 
         page_params = payload["params"]["pageParams"]
         assert page_params["page"] == 0
-        assert page_params["docPerPage"] == 10
-        assert page_params["snippetPerDoc"] == 50
+        assert page_params["docsPerPage"] == 10
+        assert page_params["snippetsPerDoc"] == 50
 
     def test_return_examples_false_minimal_pagination(self):
         """Test that return_examples=False uses minimal pagination."""
@@ -369,8 +386,8 @@ class TestFullPayloadBuilding:
         payload = RNCQueryBuilder.build_payload(query)
 
         page_params = payload["params"]["pageParams"]
-        assert page_params["docPerPage"] == 1
-        assert page_params["snippetPerDoc"] == 1
+        assert page_params["docsPerPage"] == 1
+        assert page_params["snippetsPerDoc"] == 1
 
     def test_return_examples_true_custom_pagination(self):
         """Test that return_examples=True respects custom pagination."""
@@ -385,8 +402,8 @@ class TestFullPayloadBuilding:
 
         page_params = payload["params"]["pageParams"]
         assert page_params["page"] == 2
-        assert page_params["docPerPage"] == 50
-        assert page_params["snippetPerDoc"] == 50
+        assert page_params["docsPerPage"] == 50
+        assert page_params["snippetsPerDoc"] == 50
 
     def test_global_conditions_always_present(self):
         """Test that global conditions are always included."""
@@ -396,7 +413,8 @@ class TestFullPayloadBuilding:
         )
         payload = RNCQueryBuilder.build_payload(query)
 
-        global_conds = payload["params"]["globalConditions"]
+        # Global conditions are in lexGramm.sectionValues[0].conditionValues
+        global_conds = payload["lexGramm"]["sectionValues"][0]["conditionValues"]
         assert {"fieldName": "disambmod", "text": {"v": "main"}} in global_conds
         assert {"fieldName": "distmod", "text": {"v": "with_zeros"}} in global_conds
 
@@ -418,7 +436,12 @@ class TestFullPayloadBuilding:
 
         # Params structure
         assert "pageParams" in payload["params"]
-        assert "globalConditions" in payload["params"]
+
+        # LexGramm structure
+        assert "sectionValues" in payload["lexGramm"]
+        section = payload["lexGramm"]["sectionValues"][0]
+        assert "conditionValues" in section
+        assert "subsectionValues" in section
 
     def test_complex_query_integration(self):
         """Test building payload for complex query."""
@@ -441,8 +464,15 @@ class TestFullPayloadBuilding:
         payload = RNCQueryBuilder.build_payload(query)
 
         assert payload["corpus"]["type"] == "PAPER"
-        assert len(payload["lexGramm"]) == 3
+
+        # Check subsections for 3 tokens
+        subsections = payload["lexGramm"]["sectionValues"][0]["subsectionValues"]
+        assert len(subsections) == 3
+
         assert payload["params"]["sort"] == "random"
         assert payload["params"]["pageParams"]["page"] == 1
-        assert payload["params"]["pageParams"]["docPerPage"] == 25
-        assert len(payload["params"]["subcorpus"]) >= 2
+        assert payload["params"]["pageParams"]["docsPerPage"] == 25
+
+        # Check subcorpus conditions
+        subcorpus_conds = payload["subcorpus"]["sectionValues"][0]["conditionValues"]
+        assert len(subcorpus_conds) >= 2

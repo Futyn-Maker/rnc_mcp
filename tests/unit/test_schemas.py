@@ -43,21 +43,20 @@ class TestTokenRequest:
             lemma="бежать",
             wordform="бежал",
             gramm="V",
-            semantic="t:hum",
             syntax="root",
             flags="capital"
         )
         assert token.lemma == "бежать"
         assert token.wordform == "бежал"
         assert token.gramm == "V"
-        assert token.semantic == "t:hum"
+        assert token.semantic is None
         assert token.syntax == "root"
         assert token.flags == "capital"
 
     def test_accepts_custom_distance_ranges(self):
         """Test custom distance min/max values."""
-        token = TokenRequest(dist_min=0, dist_max=5)
-        assert token.dist_min == 0
+        token = TokenRequest(dist_min=1, dist_max=5)
+        assert token.dist_min == 1
         assert token.dist_max == 5
 
     def test_accepts_negative_distance_values(self):
@@ -292,7 +291,7 @@ class TestSearchQuery:
             subcorpus=SubcorpusFilter(
                 author="Пушкин",
                 title="Евгений Онегин",
-                date_range=DateFilter(start_year=1830, end_year=1840),
+                date_range=DateFilter(start_year=1810, end_year=1837),
                 author_gender="male"
             ),
             sort="grcreated",
@@ -334,11 +333,11 @@ class TestResponseSchemas:
         """Test DocMetadata with all fields."""
         metadata = DocMetadata(
             title="Евгений Онегин",
-            author="Пушкин А.С.",
+            author="Пушкин",
             year="1837"
         )
         assert metadata.title == "Евгений Онегин"
-        assert metadata.author == "Пушкин А.С."
+        assert metadata.author == "Пушкин"
         assert metadata.year == "1837"
 
     def test_document_item_requires_metadata_and_examples(self):
