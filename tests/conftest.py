@@ -31,15 +31,6 @@ from tests.fixtures.sample_queries import (
 # ==============================================================================
 
 
-@pytest.fixture(scope="session")
-def real_api_token():
-    """Real RNC API token for E2E tests."""
-    token = os.getenv("RNC_API_TOKEN")
-    if not token:
-        pytest.skip("RNC_API_TOKEN not set, skipping E2E tests")
-    return token
-
-
 @pytest.fixture
 def mock_env_token(monkeypatch):
     """Mock environment variable for unit tests."""
@@ -75,30 +66,10 @@ def mock_rnc_client():
     client.get_attributes = AsyncMock()
     return client
 
-
-@pytest.fixture
-def real_rnc_client():
-    """Real RNCClient for integration tests (with mocked HTTP)."""
-    return RNCClient()
-
-
-# ==============================================================================
-# FastMCP Fixtures
-# ==============================================================================
-
-@pytest.fixture
-async def mcp_server():
-    """FastMCP server instance for testing."""
-    from rnc_mcp.mcp import mcp
-    yield mcp
-
-
-# Note: FastMCP test client fixture will be added once we understand
-# the exact API for creating test clients in FastMCP
-
 # ==============================================================================
 # Mock Response Fixtures
 # ==============================================================================
+
 
 @pytest.fixture
 def mock_concordance_response():
@@ -147,18 +118,6 @@ def statistics_only_query():
 
 
 # ==============================================================================
-# HTTP Mock Fixtures (for httpx with respx)
-# ==============================================================================
-
-@pytest.fixture
-def respx_mock():
-    """Respx mock for testing HTTP requests."""
-    import respx
-    with respx.mock:
-        yield respx
-
-
-# ==============================================================================
 # Pytest Hooks and Configuration
 # ==============================================================================
 
@@ -166,15 +125,6 @@ def pytest_configure(config):
     """Register custom markers."""
     config.addinivalue_line(
         "markers", "unit: Unit tests (no network)"
-    )
-    config.addinivalue_line(
-        "markers", "integration: Integration tests (mocked HTTP)"
-    )
-    config.addinivalue_line(
-        "markers", "e2e: End-to-end tests (real API calls)"
-    )
-    config.addinivalue_line(
-        "markers", "slow: Tests that take significant time"
     )
 
 
