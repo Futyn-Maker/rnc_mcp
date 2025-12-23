@@ -2,7 +2,7 @@ from fastmcp import FastMCP, Context
 from rnc_mcp.schemas.schemas import SearchQuery, ConcordanceResponse
 from rnc_mcp.services.rnc_builder import RNCQueryBuilder
 from rnc_mcp.services.rnc_formatter import RNCResponseFormatter
-from rnc_mcp.client import RNCClient
+from rnc_mcp.clients.rnc_client import RNCClient
 from rnc_mcp.config import Config
 from rnc_mcp.resources.rnc_generator import RNCResourceGenerator
 from rnc_mcp.exceptions import RNCConfigError

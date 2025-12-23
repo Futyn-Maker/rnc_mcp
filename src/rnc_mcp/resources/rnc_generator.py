@@ -1,10 +1,13 @@
-from rnc_mcp.client import RNCClient
+from rnc_mcp.clients.base import CorpusClient
+from rnc_mcp.resources.base import CorpusResourceGenerator
 from rnc_mcp.config import Config
 
 
-class RNCResourceGenerator:
-    def __init__(self, client: RNCClient):
-        self.client = client
+class RNCResourceGenerator(CorpusResourceGenerator):
+    """Generates markdown descriptions for RNC corpora."""
+
+    def __init__(self, client: CorpusClient):
+        super().__init__(client)
 
     async def generate(self, corpus: str) -> str:
         """

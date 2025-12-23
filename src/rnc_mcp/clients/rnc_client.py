@@ -2,10 +2,11 @@ import httpx
 import json
 from typing import Dict, Any
 from rnc_mcp.config import Config
+from rnc_mcp.clients.base import CorpusClient
 from rnc_mcp.exceptions import RNCAuthError, RNCAPIError
 
 
-class RNCClient:
+class RNCClient(CorpusClient):
     def __init__(self):
         self.timeout = httpx.Timeout(30.0, connect=10.0)
 

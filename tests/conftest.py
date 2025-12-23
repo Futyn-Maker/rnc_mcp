@@ -1,7 +1,6 @@
 """Shared fixtures and pytest configuration for RNC MCP tests."""
 
 import pytest
-import os
 import sys
 from unittest.mock import Mock, AsyncMock
 from pathlib import Path
@@ -11,7 +10,7 @@ src_path = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 # fmt: off
-from rnc_mcp.client import RNCClient  # noqa: E402
+from rnc_mcp.clients.rnc_client import RNCClient  # noqa: E402
 from rnc_mcp.config import Config  # noqa: E402
 from tests.fixtures.mock_responses import (
     CONCORDANCE_SUCCESS,
