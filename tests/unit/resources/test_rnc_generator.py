@@ -22,7 +22,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
         mock_rnc_client.get_attributes.return_value = ATTRIBUTES_GRAMMAR
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert isinstance(result, str)
@@ -49,7 +49,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_NO_SORTINGS
         mock_rnc_client.get_attributes.return_value = ATTRIBUTES_EMPTY
 
-        generator = RNCResourceGenerator
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert "No sorting methods available" in result or "_No sorting methods_" in result

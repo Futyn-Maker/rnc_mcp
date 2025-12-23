@@ -113,7 +113,7 @@ class TestRncCorpusType:
     def test_enum_values_match_config_keys(self):
         """Test that enum values match Config.CORPORA keys."""
         corpus_types = {member.value for member in RncCorpusType}
-        config_keys = set(Config.CORPORA.keys())
+        config_keys = set(Config.RNC_CORPORA.keys())
         assert corpus_types == config_keys
 
     def test_enum_member_access(self):
