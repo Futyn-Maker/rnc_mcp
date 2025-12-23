@@ -5,6 +5,7 @@ from rnc_mcp.services.formatter import RNCResponseFormatter
 from rnc_mcp.client import RNCClient
 from rnc_mcp.config import Config
 from rnc_mcp.resources.generator import RNCResourceGenerator
+from rnc_mcp.exceptions import RNCConfigError
 
 
 mcp = FastMCP(
@@ -44,7 +45,7 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
     """
     try:
         Config.get_token()
-    except ValueError as e:
+    except RNCConfigError as e:
         raise RuntimeError(str(e))
 
     await ctx.info(f"Searching {query.corpus}...")

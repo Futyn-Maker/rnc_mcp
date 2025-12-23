@@ -2,6 +2,7 @@ import httpx
 import json
 from typing import Dict, Any
 from rnc_mcp.config import Config
+from rnc_mcp.exceptions import RNCAuthError, RNCAPIError
 
 
 class RNCClient:
@@ -21,8 +22,9 @@ class RNCClient:
                 return response.json()
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 401:
-                    raise ValueError("Invalid RNC Token.")
-                raise ValueError(
+                    raise RNCAuthError(
+                        "Invalid RNC Token. Please check your API key.")
+                raise RNCAPIError(
                     f"RNC API Error {
                         e.response.status_code}: {
                         e.response.text}")

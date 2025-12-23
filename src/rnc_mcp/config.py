@@ -2,6 +2,8 @@ import os
 from typing import Optional, Dict
 from dotenv import load_dotenv
 
+from rnc_mcp.exceptions import RNCConfigError
+
 
 # Load environment variables from .env file if it exists
 load_dotenv()
@@ -30,7 +32,7 @@ class Config:
     @classmethod
     def get_token(cls) -> str:
         if not cls._RNC_TOKEN:
-            raise ValueError(
+            raise RNCConfigError(
                 "RNC_API_TOKEN is not set. Please generate a token at "
                 "https://ruscorpora.ru/accounts/profile/for-devs and set it "
                 "in your environment variables."
