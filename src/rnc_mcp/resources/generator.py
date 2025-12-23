@@ -2,7 +2,7 @@ from rnc_mcp.client import RNCClient
 from rnc_mcp.config import Config
 
 
-class CorpusResourceGenerator:
+class RNCResourceGenerator:
     def __init__(self, client: RNCClient):
         self.client = client
 

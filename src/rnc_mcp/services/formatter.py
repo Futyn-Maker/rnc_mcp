@@ -2,7 +2,7 @@ from typing import Dict, Any, List, Optional
 from rnc_mcp.schemas.schemas import ConcordanceResponse, DocumentItem, DocMetadata, GlobalStats, StatValues
 
 
-class ResponseFormatter:
+class RNCResponseFormatter:
     @staticmethod
     def _extract_meta(doc_info: Dict[str, Any]) -> DocMetadata:
         title = doc_info.get("title", "Unknown Title")
@@ -58,9 +58,9 @@ class ResponseFormatter:
 
         return "".join(text_builder)
 
-    @staticmethod
+    @classmethod
     def format_search_results(
-            raw_response: Dict[str, Any]) -> ConcordanceResponse:
+            cls, raw_response: Dict[str, Any]) -> ConcordanceResponse:
         pagination = raw_response.get("pagination", {})
         total_pages = pagination.get("totalPageCount", 0)
 
@@ -88,7 +88,7 @@ class ResponseFormatter:
             docs = group.get("docs", [])
             for doc in docs:
                 info = doc.get("info", {})
-                metadata = ResponseFormatter._extract_meta(info)
+                metadata = cls._extract_meta(info)
 
                 examples = []
                 snippet_groups = doc.get("snippetGroups", [])
@@ -96,7 +96,7 @@ class ResponseFormatter:
                     for snippet in sg.get("snippets", []):
                         for seq in snippet.get("sequences", []):
                             words = seq.get("words", [])
-                            text = ResponseFormatter._format_snippet_text(
+                            text = cls._format_snippet_text(
                                 words)
                             if text:
                                 examples.append(text)

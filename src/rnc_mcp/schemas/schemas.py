@@ -15,6 +15,8 @@ _corpus_options_doc = "\n".join(
 )
 
 
+# Request schemas
+
 class TokenRequest(BaseModel):
     lemma: Optional[str] = Field(
         None, description="The dictionary form of the word (e.g., 'бежать')."
@@ -104,6 +106,8 @@ class SearchQuery(BaseModel):
         )
     )
 
+
+# Response schemas
 
 class DocMetadata(BaseModel):
     title: str

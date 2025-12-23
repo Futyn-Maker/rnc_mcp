@@ -1,16 +1,16 @@
 from fastmcp import FastMCP, Context
 from rnc_mcp.schemas.schemas import SearchQuery, ConcordanceResponse
 from rnc_mcp.services.builder import RNCQueryBuilder
-from rnc_mcp.services.formatter import ResponseFormatter
+from rnc_mcp.services.formatter import RNCResponseFormatter
 from rnc_mcp.client import RNCClient
 from rnc_mcp.config import Config
-from rnc_mcp.resources.generator import CorpusResourceGenerator
+from rnc_mcp.resources.generator import RNCResourceGenerator
 
 
 mcp = FastMCP(
     "Russian National Corpus")
 client = RNCClient()
-resource_generator = CorpusResourceGenerator(client)
+resource_generator = RNCResourceGenerator(client)
 
 
 def register_corpus_resources():
@@ -60,7 +60,7 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
         raise RuntimeError(f"API Execution Error: {str(e)}")
 
     try:
-        formatted_response = ResponseFormatter.format_search_results(
+        formatted_response = RNCResponseFormatter.format_search_results(
             raw_result)
 
         # Clear results if user only wants statistics

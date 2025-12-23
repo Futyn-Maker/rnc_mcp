@@ -41,13 +41,6 @@ class RNCClient:
     async def get_attributes(
         self, corpus_type: str, attr_type: str
     ) -> Dict[str, Any]:
-        """
-        Fetch attributes for a corpus.
-
-        Args:
-            corpus_type: The corpus type (e.g., 'MAIN')
-            attr_type: The attribute type ('gr', 'sem', 'syntax', 'flags')
-        """
         async with httpx.AsyncClient(
             timeout=self.timeout, follow_redirects=True
         ) as client:

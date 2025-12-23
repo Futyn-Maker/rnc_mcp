@@ -69,9 +69,9 @@ class RNCQueryBuilder:
 
         return date_cond if has_date else None
 
-    @staticmethod
+    @classmethod
     def _build_subcorpus_conditions(
-        subcorpus: SubcorpusFilter
+        cls, subcorpus: SubcorpusFilter
     ) -> List[Dict[str, Any]]:
         """Build subcorpus filtering conditions."""
         conditions = []
@@ -92,7 +92,7 @@ class RNCQueryBuilder:
 
         # Document creation date
         if subcorpus.date_range:
-            date_cond = RNCQueryBuilder._build_date_range_condition(
+            date_cond = cls._build_date_range_condition(
                 subcorpus.date_range
             )
             if date_cond:
