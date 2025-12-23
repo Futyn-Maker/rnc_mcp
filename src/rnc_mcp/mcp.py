@@ -49,14 +49,17 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
         raise RuntimeError(str(e))
 
     await ctx.info(f"Searching {query.corpus}...")
+    await ctx.debug(f"Query: {query}")
 
     try:
         payload = RNCQueryBuilder.build_payload(query)
+        await ctx.debug(f"Payload: {payload}")
     except Exception as e:
         raise RuntimeError(f"Query Build Error: {str(e)}")
 
     try:
         raw_result = await client.execute_concordance(payload)
+        await ctx.debug(f"Raw Result: {raw_result}")
     except Exception as e:
         raise RuntimeError(f"API Execution Error: {str(e)}")
 
@@ -67,6 +70,8 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
         # Clear results if user only wants statistics
         if not query.return_examples:
             formatted_response.results = []
+
+        await ctx.debug(f"Formatted Response: {formatted_response}")
 
         return formatted_response
     except Exception as e:

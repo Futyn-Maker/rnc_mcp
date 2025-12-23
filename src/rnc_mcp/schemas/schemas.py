@@ -43,10 +43,36 @@ class TokenRequest(BaseModel):
     dist_min: int = Field(1, description="Min distance from previous word.")
     dist_max: int = Field(1, description="Max distance from previous word.")
 
+    def __str__(self):
+        parts = []
+        if self.lemma:
+            parts.append(f"lemma='{self.lemma}'")
+        if self.wordform:
+            parts.append(f"form='{self.wordform}'")
+        if self.gramm:
+            parts.append(f"gr='{self.gramm}'")
+        if self.semantic:
+            parts.append(f"sem='{self.semantic}'")
+        if self.syntax:
+            parts.append(f"synt='{self.syntax}'")
+        if self.flags:
+            parts.append(f"flags='{self.flags}'")
+
+        if self.dist_min != 1 or self.dist_max != 1:
+            parts.append(f"dist={self.dist_min}..{self.dist_max}")
+
+        content = ", ".join(parts) if parts else "empty_token"
+        return f"Token[{content}]"
+
 
 class DateFilter(BaseModel):
     start_year: Optional[int] = None
     end_year: Optional[int] = None
+
+    def __str__(self):
+        start = self.start_year if self.start_year is not None else ""
+        end = self.end_year if self.end_year is not None else ""
+        return f"{start}-{end}"
 
 
 class SubcorpusFilter(BaseModel):
@@ -70,6 +96,23 @@ class SubcorpusFilter(BaseModel):
         None,
         description="Homonymy disambiguation mode (auto or manual tagging)."
     )
+
+    def __str__(self):
+        parts = []
+        if self.author:
+            parts.append(f"author='{self.author}'")
+        if self.title:
+            parts.append(f"title='{self.title}'")
+        if self.date_range:
+            parts.append(f"date={self.date_range}")
+        if self.author_gender:
+            parts.append(f"sex={self.author_gender}")
+        if self.author_birthyear_range:
+            parts.append(f"author_birth={self.author_birthyear_range}")
+        if self.disambiguation:
+            parts.append(f"mode={self.disambiguation}")
+
+        return ", ".join(parts)
 
 
 class SearchQuery(BaseModel):
@@ -106,6 +149,24 @@ class SearchQuery(BaseModel):
         )
     )
 
+    def __str__(self):
+        lines = [f"SearchQuery ({self.corpus.value}):"]
+
+        lines.append("  Tokens:")
+        for i, token in enumerate(self.tokens, 1):
+            lines.append(f"    {i}. {token}")
+
+        if self.subcorpus:
+            lines.append(f"  Subcorpus: {self.subcorpus}")
+
+        lines.append(f"  Page: {self.page} (size={self.per_page})")
+        if self.sort:
+            lines.append(f"  Sort: {self.sort}")
+        if not self.return_examples:
+            lines.append("  Mode: Stats only")
+
+        return "\n".join(lines)
+
 
 # Response schemas
 
@@ -114,16 +175,33 @@ class DocMetadata(BaseModel):
     author: Optional[str] = None
     year: Optional[str] = None
 
+    def __str__(self):
+        parts = [self.title]
+        meta = []
+        if self.author:
+            meta.append(self.author)
+        if self.year:
+            meta.append(self.year)
+        if meta:
+            parts.append(f"({', '.join(meta)})")
+        return " ".join(parts)
+
 
 class DocumentItem(BaseModel):
     metadata: DocMetadata
     examples: List[str] = Field(...,
                                 description="List of text fragments found in the document.")
 
+    def __str__(self):
+        return f"{self.metadata}: {len(self.examples)} matches"
+
 
 class StatValues(BaseModel):
     textCount: Optional[int] = None
     wordUsageCount: Optional[int] = None
+
+    def __str__(self):
+        return f"docs={self.textCount or 0}, words={self.wordUsageCount or 0}"
 
 
 class GlobalStats(BaseModel):
@@ -132,7 +210,30 @@ class GlobalStats(BaseModel):
     queryStats: Optional[StatValues] = None
     total_pages_available: int
 
+    def __str__(self):
+        lines = []
+        if self.corpusStats:
+            lines.append(f"Corpus: {self.corpusStats}")
+        if self.subcorpStats:
+            lines.append(f"Subcorpus: {self.subcorpStats}")
+        if self.queryStats:
+            lines.append(f"Found: {self.queryStats}")
+        lines.append(f"Total Pages: {self.total_pages_available}")
+        return ", ".join(lines)
+
 
 class ConcordanceResponse(BaseModel):
     stats: GlobalStats
     results: List[DocumentItem]
+
+    def __str__(self):
+        header = f"Response Stats: [{self.stats}]"
+        if not self.results:
+            return header + "\nResults: None"
+
+        preview = "\n".join([f"  - {doc}" for doc in self.results[:3]])
+        remaining = len(self.results) - 3
+        if remaining > 0:
+            preview += f"\n  ... and {remaining} more"
+
+        return f"{header}\nResults:\n{preview}"
