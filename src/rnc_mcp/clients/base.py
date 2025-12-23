@@ -7,7 +7,7 @@ class CorpusClient(ABC):
 
     @abstractmethod
     async def execute_concordance(
-            self, payload: Dict[str, Any]) -> Dict[str, Any]:
+            self, payload: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         """Execute a search query against the corpus."""
         pass
 

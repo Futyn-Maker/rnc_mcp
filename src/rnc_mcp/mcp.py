@@ -58,7 +58,7 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
         raise RuntimeError(f"Query Build Error: {str(e)}")
 
     try:
-        raw_result = await client.execute_concordance(payload)
+        raw_result = await client.execute_concordance(payload, ctx=ctx)
         await ctx.debug(f"Raw Result: {raw_result}")
     except Exception as e:
         raise RuntimeError(f"API Execution Error: {str(e)}")

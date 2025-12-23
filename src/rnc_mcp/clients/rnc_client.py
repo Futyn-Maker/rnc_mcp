@@ -4,14 +4,16 @@ from typing import Dict, Any
 from rnc_mcp.config import Config
 from rnc_mcp.clients.base import CorpusClient
 from rnc_mcp.exceptions import RNCAuthError, RNCAPIError
+from rnc_mcp.utils import measure_time
 
 
 class RNCClient(CorpusClient):
     def __init__(self):
         self.timeout = httpx.Timeout(30.0, connect=10.0)
 
+    @measure_time
     async def execute_concordance(
-            self, payload: Dict[str, Any]) -> Dict[str, Any]:
+            self, payload: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             try:
                 response = await client.post(
