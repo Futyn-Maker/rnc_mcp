@@ -12,7 +12,7 @@ class RNCResourceGenerator:
         including sorting methods and all attribute types.
         """
         try:
-            Config.get_token()
+            Config.get_rnc_token()
 
             # Fetch Data
             config_data = await self.client.get_corpus_config(corpus)

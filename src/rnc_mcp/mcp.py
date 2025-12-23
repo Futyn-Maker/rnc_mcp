@@ -1,10 +1,10 @@
 from fastmcp import FastMCP, Context
 from rnc_mcp.schemas.schemas import SearchQuery, ConcordanceResponse
-from rnc_mcp.services.builder import RNCQueryBuilder
-from rnc_mcp.services.formatter import RNCResponseFormatter
+from rnc_mcp.services.rnc_builder import RNCQueryBuilder
+from rnc_mcp.services.rnc_formatter import RNCResponseFormatter
 from rnc_mcp.client import RNCClient
 from rnc_mcp.config import Config
-from rnc_mcp.resources.generator import RNCResourceGenerator
+from rnc_mcp.resources.rnc_generator import RNCResourceGenerator
 from rnc_mcp.exceptions import RNCConfigError
 
 
@@ -25,7 +25,7 @@ def register_corpus_resources():
             return await resource_generator.generate(corpus_code)
         return handler
 
-    for code, desc in Config.CORPORA.items():
+    for code, desc in Config.RNC_CORPORA.items():
         uri = f"rnc://{code}/info"
         name = f"{desc}: Info"
 
@@ -44,7 +44,7 @@ async def concordance(query: SearchQuery, ctx: Context) -> ConcordanceResponse:
     Returns statistics and optionally a list of documents with examples.
     """
     try:
-        Config.get_token()
+        Config.get_rnc_token()
     except RNCConfigError as e:
         raise RuntimeError(str(e))
 

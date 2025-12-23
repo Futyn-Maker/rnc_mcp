@@ -1,7 +1,7 @@
 """Unit tests for ResponseFormatter."""
 
 import pytest
-from rnc_mcp.services.formatter import ResponseFormatter
+from rnc_mcp.services.rnc_formatter import RNCResponseFormatter
 from rnc_mcp.schemas.schemas import ConcordanceResponse, DocMetadata
 from tests.fixtures.mock_responses import (
     CONCORDANCE_SUCCESS,
@@ -26,7 +26,7 @@ class TestMetadataExtraction:
                                                                     {"name": "header",
                                                                      "value": [{"valString": {"v": "Евгений Онегин"}}]}]}]}}
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.title == "Test Title"  # Title takes precedence
         assert metadata.author == "Пушкин"
@@ -36,7 +36,7 @@ class TestMetadataExtraction:
         """Test metadata extraction when docExplainInfo is missing."""
         doc_info = {"title": "Test Title"}
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.title == "Test Title"
         assert metadata.author is None
@@ -53,7 +53,7 @@ class TestMetadataExtraction:
             }
         }
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.title == "Default Title"
         assert metadata.author is None
@@ -77,7 +77,7 @@ class TestMetadataExtraction:
             }
         }
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.author == "Толстой"
         assert metadata.year is None
@@ -100,7 +100,7 @@ class TestMetadataExtraction:
             }
         }
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.year == "1900"
         assert metadata.author is None
@@ -123,7 +123,7 @@ class TestMetadataExtraction:
             }
         }
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.title == "Анна Каренина"
 
@@ -131,8 +131,7 @@ class TestMetadataExtraction:
         """Test Unknown Title default when no title or header."""
         doc_info = {}
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
-
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
         assert metadata.title == "Unknown Title"
 
     def test_empty_value_array(self):
@@ -153,7 +152,7 @@ class TestMetadataExtraction:
             }
         }
 
-        metadata = ResponseFormatter._extract_meta(doc_info)
+        metadata = RNCResponseFormatter._extract_meta(doc_info)
 
         assert metadata.author is None
 
@@ -172,7 +171,7 @@ class TestSnippetHighlighting:
             {"text": "чудное", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == "Я **помню** чудное"
 
@@ -188,7 +187,7 @@ class TestSnippetHighlighting:
             {"text": "word2", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == "word1 **hit1 hit2** word2"
 
@@ -200,7 +199,7 @@ class TestSnippetHighlighting:
             {"text": "word2", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == "word1 word2"
 
@@ -208,7 +207,7 @@ class TestSnippetHighlighting:
         """Test empty words array returns empty string."""
         words = []
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == ""
 
@@ -220,7 +219,7 @@ class TestSnippetHighlighting:
             {"text": "second", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text.startswith("**first")
 
@@ -232,7 +231,7 @@ class TestSnippetHighlighting:
             {"text": "last", "displayParams": {"hit": True}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text.endswith("last**")
 
@@ -244,7 +243,7 @@ class TestSnippetHighlighting:
             {"text": "c", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == "abc"
 
@@ -255,7 +254,7 @@ class TestSnippetHighlighting:
             {"text": "word", "displayParams": {}}
         ]
 
-        text = ResponseFormatter._format_snippet_text(words)
+        text = RNCResponseFormatter._format_snippet_text(words)
 
         assert text == "word"
 
@@ -266,7 +265,8 @@ class TestStatsParsing:
 
     def test_all_stats_present(self):
         """Test parsing when all stats are present."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_SUCCESS)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_SUCCESS)
 
         assert response.stats.corpusStats is not None
         assert response.stats.corpusStats.textCount == 1000000
@@ -285,7 +285,7 @@ class TestStatsParsing:
             "groups": []
         }
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         assert response.stats.corpusStats is None
         assert response.stats.subcorpStats is None
@@ -299,7 +299,7 @@ class TestStatsParsing:
             "groups": []
         }
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         assert response.stats.corpusStats.textCount == 100
         assert response.stats.corpusStats.wordUsageCount is None
@@ -311,7 +311,7 @@ class TestStatsParsing:
             "groups": []
         }
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         assert response.stats.total_pages_available == 42
 
@@ -319,7 +319,7 @@ class TestStatsParsing:
         """Test that missing pagination defaults to 0."""
         raw_response = {"groups": []}
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         assert response.stats.total_pages_available == 0
 
@@ -330,7 +330,8 @@ class TestFullResponseFormatting:
 
     def test_response_with_results(self):
         """Test formatting response with results."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_SUCCESS)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_SUCCESS)
 
         assert isinstance(response, ConcordanceResponse)
         assert len(response.results) > 0
@@ -338,14 +339,15 @@ class TestFullResponseFormatting:
 
     def test_empty_groups_array(self):
         """Test response with empty groups array."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_EMPTY)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_EMPTY)
 
         assert len(response.results) == 0
         assert response.stats.queryStats.textCount == 0
 
     def test_multiple_documents(self):
         """Test formatting response with multiple documents."""
-        response = ResponseFormatter.format_search_results(
+        response = RNCResponseFormatter.format_search_results(
             CONCORDANCE_MULTIPLE_DOCS)
 
         assert len(response.results) == 2
@@ -354,7 +356,7 @@ class TestFullResponseFormatting:
 
     def test_multiple_snippets_per_document(self):
         """Test document with multiple snippets."""
-        response = ResponseFormatter.format_search_results(
+        response = RNCResponseFormatter.format_search_results(
             CONCORDANCE_MULTIPLE_DOCS)
 
         # Second document has 2 snippets
@@ -362,7 +364,8 @@ class TestFullResponseFormatting:
 
     def test_nested_structure_traversal(self):
         """Test traversal of groups → docs → snippetGroups → snippets → sequences → words."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_SUCCESS)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_SUCCESS)
 
         # Should successfully extract examples from deeply nested structure
         assert len(response.results) > 0
@@ -377,7 +380,7 @@ class TestFullResponseFormatting:
                                              {"info": {"title": "Doc without snippets"},
                                               "snippetGroups": []}]}]}
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         # Only document with examples should be included
         assert len(response.results) == 1
@@ -411,7 +414,7 @@ class TestFullResponseFormatting:
             ]
         }
 
-        response = ResponseFormatter.format_search_results(raw_response)
+        response = RNCResponseFormatter.format_search_results(raw_response)
 
         # Should not raise exceptions
         assert response.stats.total_pages_available == 0
@@ -419,7 +422,8 @@ class TestFullResponseFormatting:
 
     def test_concordance_response_structure(self):
         """Test that response matches ConcordanceResponse structure."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_SUCCESS)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_SUCCESS)
 
         assert hasattr(response, 'stats')
         assert hasattr(response, 'results')
@@ -430,7 +434,7 @@ class TestFullResponseFormatting:
 
     def test_missing_metadata_response(self):
         """Test formatting response with missing metadata."""
-        response = ResponseFormatter.format_search_results(
+        response = RNCResponseFormatter.format_search_results(
             CONCORDANCE_MISSING_METADATA)
 
         assert len(response.results) == 1
@@ -439,7 +443,8 @@ class TestFullResponseFormatting:
 
     def test_no_hits_response(self):
         """Test formatting response with no hit highlighting."""
-        response = ResponseFormatter.format_search_results(CONCORDANCE_NO_HITS)
+        response = RNCResponseFormatter.format_search_results(
+            CONCORDANCE_NO_HITS)
 
         assert len(response.results) == 1
         # Text should still be formatted even without hits

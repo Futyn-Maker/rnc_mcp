@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock
-from rnc_mcp.resources.generator import CorpusResourceGenerator
+from rnc_mcp.resources.rnc_generator import RNCResourceGenerator
 from tests.fixtures.mock_responses import (
     CORPUS_CONFIG_MAIN,
     CORPUS_CONFIG_NO_SORTINGS,
@@ -36,7 +36,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
         mock_rnc_client.get_attributes.return_value = ATTRIBUTES_EMPTY
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert "## Available Sorting Methods" in result
@@ -49,7 +49,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_NO_SORTINGS
         mock_rnc_client.get_attributes.return_value = ATTRIBUTES_EMPTY
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator
         result = await generator.generate("MAIN")
 
         assert "No sorting methods available" in result or "_No sorting methods_" in result
@@ -61,7 +61,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
         mock_rnc_client.get_attributes.return_value = ATTRIBUTES_GRAMMAR
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert "## Grammar Tags" in result
@@ -74,7 +74,7 @@ class TestMarkdownGeneration:
         # Simulate failure for one attribute type
         mock_rnc_client.get_attributes.side_effect = Exception("API Error")
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         # Should still return markdown (not raise exception)
@@ -88,7 +88,7 @@ class TestMarkdownGeneration:
         mock_rnc_client.get_corpus_config.side_effect = Exception(
             "Config fetch failed")
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert isinstance(result, str)
@@ -105,7 +105,7 @@ class TestOptionFormatting:
             {"value": "S", "title": "Существительное"}
         ]
 
-        generator = CorpusResourceGenerator(None)
+        generator = RNCResourceGenerator(None)
         result = generator._format_options(options)
 
         assert "`S`" in result
@@ -125,7 +125,7 @@ class TestOptionFormatting:
             }
         ]
 
-        generator = CorpusResourceGenerator(None)
+        generator = RNCResourceGenerator(None)
         result = generator._format_options(options)
 
         assert "`S`" in result
@@ -146,7 +146,7 @@ class TestOptionFormatting:
             }
         ]
 
-        generator = CorpusResourceGenerator(None)
+        generator = RNCResourceGenerator(None)
         result = generator._format_options(options)
 
         assert "**Таксономия**" in result
@@ -154,7 +154,7 @@ class TestOptionFormatting:
 
     def test_format_empty_options(self):
         """Test formatting of empty options list."""
-        generator = CorpusResourceGenerator(None)
+        generator = RNCResourceGenerator(None)
         result = generator._format_options([])
 
         assert result == ""
@@ -168,7 +168,7 @@ class TestErrorHandling:
     async def test_missing_token_returns_error_message(
             self, mock_rnc_client, clear_env_token):
         """Test that missing token returns error message string."""
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert isinstance(result, str)
@@ -181,7 +181,7 @@ class TestErrorHandling:
         mock_rnc_client.get_corpus_config.side_effect = Exception(
             "Network error")
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
         result = await generator.generate("MAIN")
 
         assert isinstance(result, str)
@@ -195,7 +195,7 @@ class TestErrorHandling:
         mock_rnc_client.get_corpus_config.side_effect = Exception("Error 1")
         mock_rnc_client.get_attributes.side_effect = Exception("Error 2")
 
-        generator = CorpusResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(mock_rnc_client)
 
         # Should not raise
         result = await generator.generate("MAIN")

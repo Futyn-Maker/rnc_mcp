@@ -1,7 +1,7 @@
 """Unit tests for RNCQueryBuilder."""
 
 import pytest
-from rnc_mcp.services.builder import RNCQueryBuilder
+from rnc_mcp.services.rnc_builder import RNCQueryBuilder
 from rnc_mcp.schemas.schemas import (
     SearchQuery,
     TokenRequest,
@@ -350,7 +350,8 @@ class TestFullPayloadBuilding:
         # Subcorpus is at top level, not in params
         assert "subcorpus" in payload
         subcorpus_conds = payload["subcorpus"]["sectionValues"][0]["conditionValues"]
-        assert {"fieldName": "author", "text": {"v": "Пушкин"}} in subcorpus_conds
+        assert {"fieldName": "author", "text": {
+            "v": "Пушкин"}} in subcorpus_conds
 
     def test_with_sort_parameter(self):
         """Test payload with sort parameter."""
@@ -415,8 +416,12 @@ class TestFullPayloadBuilding:
 
         # Global conditions are in lexGramm.sectionValues[0].conditionValues
         global_conds = payload["lexGramm"]["sectionValues"][0]["conditionValues"]
-        assert {"fieldName": "disambmod", "text": {"v": "main"}} in global_conds
-        assert {"fieldName": "distmod", "text": {"v": "with_zeros"}} in global_conds
+        assert {
+            "fieldName": "disambmod",
+            "text": {
+                "v": "main"}} in global_conds
+        assert {"fieldName": "distmod", "text": {
+            "v": "with_zeros"}} in global_conds
 
     def test_payload_structure_matches_api(self):
         """Test that payload structure matches RNC API format."""

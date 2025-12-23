@@ -14,9 +14,9 @@ class RNCClient:
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             try:
                 response = await client.post(
-                    f"{Config.BASE_URL}/lex-gramm/concordance",
+                    f"{Config.RNC_BASE_URL}/lex-gramm/concordance",
                     json=payload,
-                    headers=Config.headers()
+                    headers=Config.rnc_headers()
                 )
                 response.raise_for_status()
                 return response.json()
@@ -33,9 +33,9 @@ class RNCClient:
         async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
-                f"{Config.BASE_URL}/config/",
+                f"{Config.RNC_BASE_URL}/config/",
                 params=params,
-                headers=Config.headers()
+                headers=Config.rnc_headers()
             )
             response.raise_for_status()
             return response.json()
@@ -48,9 +48,9 @@ class RNCClient:
         ) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
-                f"{Config.BASE_URL}/attrs/{attr_type}",
+                f"{Config.RNC_BASE_URL}/attrs/{attr_type}",
                 params=params,
-                headers=Config.headers()
+                headers=Config.rnc_headers()
             )
             response.raise_for_status()
             return response.json()

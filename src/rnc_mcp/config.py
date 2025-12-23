@@ -10,10 +10,10 @@ load_dotenv()
 
 
 class Config:
-    BASE_URL: str = "https://ruscorpora.ru/api/v1"
+    RNC_BASE_URL: str = "https://ruscorpora.ru/api/v1"
     _RNC_TOKEN: Optional[str] = os.getenv("RNC_API_TOKEN")
 
-    CORPORA: Dict[str, str] = {
+    RNC_CORPORA: Dict[str, str] = {
         "MAIN": "Main",
         "PAPER": "Media (newspapers)",
         "POETIC": "Poetry",
@@ -30,7 +30,7 @@ class Config:
     }
 
     @classmethod
-    def get_token(cls) -> str:
+    def get_rnc_token(cls) -> str:
         if not cls._RNC_TOKEN:
             raise RNCConfigError(
                 "RNC_API_TOKEN is not set. Please generate a token at "
@@ -40,9 +40,9 @@ class Config:
         return cls._RNC_TOKEN
 
     @classmethod
-    def headers(cls) -> dict:
+    def rnc_headers(cls) -> dict:
         return {
-            "Authorization": f"Bearer {cls.get_token()}",
+            "Authorization": f"Bearer {cls.get_rnc_token()}",
             "Content-Type": "application/json",
             "Accept": "application/json"
         }

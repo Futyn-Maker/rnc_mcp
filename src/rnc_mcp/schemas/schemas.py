@@ -6,12 +6,12 @@ from rnc_mcp.config import Config
 
 RncCorpusType = Enum(
     'RncCorpusType',
-    {code: code for code in Config.CORPORA.keys()},
+    {code: code for code in Config.RNC_CORPORA.keys()},
     type=str
 )
 
 _corpus_options_doc = "\n".join(
-    [f"- `{code}`: {desc}" for code, desc in Config.CORPORA.items()]
+    [f"- `{code}`: {desc}" for code, desc in Config.RNC_CORPORA.items()]
 )
 
 
