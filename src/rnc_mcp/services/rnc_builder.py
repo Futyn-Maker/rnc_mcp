@@ -151,8 +151,7 @@ class RNCQueryBuilder:
                 })
 
         global_conditions = [
-            {"fieldName": "disambmod", "text": {"v": "main"}},
-            {"fieldName": "distmod", "text": {"v": "with_zeros"}}
+            {"fieldName": "disambmod", "text": {"v": "all"}}
         ]
 
         # Use minimal pagination if not returning examples
