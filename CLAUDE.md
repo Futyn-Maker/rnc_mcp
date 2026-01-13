@@ -89,3 +89,70 @@ Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`
 - **services/test_rnc_builder.py**: Token conditions, distance conditions, date ranges, subcorpus filters, full payload building
 - **services/test_rnc_formatter.py**: Metadata extraction, snippet formatting, stats parsing, response structure
 - **resources/test_rnc_generator.py**: Markdown generation, sorting methods, attributes, error handling
+
+### Manual Testing with FastMCP Client
+
+For manual testing against a running server, use the FastMCP client library. Start the server first with `python3 main.py`.
+
+**List available tools and resources:**
+
+```python
+import asyncio
+from fastmcp import Client
+
+async def list_tools():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        tools = await client.list_tools()
+        print("Available tools:")
+        for tool in tools:
+            print(f"  - {tool.name}: {tool.description}")
+
+async def list_resources():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        resources = await client.list_resources()
+        print("Available resources:")
+        for resource in resources:
+            print(f"  - {resource.name}: {resource.uri}")
+
+asyncio.run(list_tools())
+asyncio.run(list_resources())
+```
+
+**Read a resource (returns a list):**
+
+```python
+async def get_corpus_info():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        data = await client.read_resource("rnc://MAIN/info")
+        resource = data[0]  # Returns a list, get first element
+        print(resource.text)
+
+asyncio.run(get_corpus_info())
+```
+
+**Call the concordance tool:**
+
+```python
+async def simple_search():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        # Tool arguments must wrap query in {"query": {...}}
+        result = await client.call_tool(
+            "concordance",
+            {
+                "query": {
+                    "corpus": "MAIN",
+                    "tokens": [{"lemma": "дом"}]
+                }
+            }
+        )
+        # Use structured_content for JSON, or result.data for Pydantic models
+        print(result.structured_content)
+
+asyncio.run(simple_search())
+```
+
+**Result object attributes:**
+- `result.structured_content` - JSON dict (recommended for easy access)
+- `result.data` - Pydantic models created by FastMCP (nested `Root` objects)
+- `result.content` - Raw content list
+- `result.is_error` - Boolean indicating if the call failed
