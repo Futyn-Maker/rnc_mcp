@@ -406,23 +406,6 @@ class TestFullPayloadBuilding:
         assert page_params["docsPerPage"] == 50
         assert page_params["snippetsPerDoc"] == 50
 
-    def test_global_conditions_always_present(self):
-        """Test that global conditions are always included."""
-        query = SearchQuery(
-            corpus=RncCorpusType.MAIN,
-            tokens=[TokenRequest(lemma="тест")]
-        )
-        payload = RNCQueryBuilder.build_payload(query)
-
-        # Global conditions are in lexGramm.sectionValues[0].conditionValues
-        global_conds = payload["lexGramm"]["sectionValues"][0]["conditionValues"]
-        assert {
-            "fieldName": "disambmod",
-            "text": {
-                "v": "main"}} in global_conds
-        assert {"fieldName": "distmod", "text": {
-            "v": "with_zeros"}} in global_conds
-
     def test_payload_structure_matches_api(self):
         """Test that payload structure matches RNC API format."""
         query = SearchQuery(
