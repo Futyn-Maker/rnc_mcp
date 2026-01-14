@@ -18,11 +18,6 @@ from tests.fixtures.mock_responses import (
     CORPUS_CONFIG_MAIN,
     ATTRIBUTES_GRAMMAR,
 )  # noqa: E402
-from tests.fixtures.sample_queries import (
-    SIMPLE_LEMMA_QUERY,
-    COMPLEX_QUERY_WITH_SUBCORPUS,
-    STATISTICS_ONLY_QUERY,
-)  # noqa: E402
 # fmt: on
 
 # ==============================================================================
@@ -92,28 +87,6 @@ def mock_corpus_config_response():
 def mock_attributes_response():
     """Sample attributes response."""
     return ATTRIBUTES_GRAMMAR.copy()
-
-
-# ==============================================================================
-# Query Fixtures
-# ==============================================================================
-
-@pytest.fixture
-def simple_search_query():
-    """Minimal valid SearchQuery."""
-    return SIMPLE_LEMMA_QUERY
-
-
-@pytest.fixture
-def complex_search_query():
-    """SearchQuery with all features."""
-    return COMPLEX_QUERY_WITH_SUBCORPUS
-
-
-@pytest.fixture
-def statistics_only_query():
-    """SearchQuery with return_examples=False."""
-    return STATISTICS_ONLY_QUERY
 
 
 # ==============================================================================

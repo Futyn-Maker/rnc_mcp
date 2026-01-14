@@ -90,6 +90,59 @@ Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`
 - **services/test_rnc_formatter.py**: Metadata extraction, snippet formatting, stats parsing, response structure
 - **resources/test_rnc_generator.py**: Markdown generation, sorting methods, attributes, error handling
 
+### E2E Tests
+
+E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code.
+
+```bash
+# Run E2E tests (requires server running on localhost:8000)
+pytest -m e2e
+
+# Run E2E tests against remote server
+E2E_SERVER_URL=http://remote-server:8000/mcp pytest -m e2e
+```
+
+Configuration via `.env.e2e` file (separate from main `.env`):
+```
+E2E_SERVER_URL=http://127.0.0.1:8000/mcp
+```
+
+E2E test files:
+- **tests/e2e/test_concordance.py**: Concordance tool tests for all 13 corpora
+- **tests/e2e/test_resources.py**: Resource generation tests for all corpora
+- **tests/fixtures/e2e_queries.py**: Raw JSON query fixtures
+
+### Corpus Status (E2E Test Results)
+
+Based on E2E tests, here is the current status of each corpus. All corpora support resource generation. Concordance query support varies:
+
+| Corpus | Simple Query | Subcorpus Filter | Notes |
+|--------|--------------|------------------|-------|
+| MAIN | ✓ | ✓ | Fully working |
+| PAPER | ✓ | ✓ | Fully working |
+| POETIC | ✗ 500 | ✗ 500 | All queries fail |
+| SPOKEN | ✓ | ✓ | Fully working |
+| DIALECT | ✓ | ✗ 500 | `author_gender` filter fails |
+| SCHOOL | ✓ | ✓ | Fully working |
+| SYNTAX | ✗ 500 | ✗ 500 | All queries fail |
+| MULTI | ✗ 500 | ✓ | Simple fails, `author_gender` works |
+| ACCENT | ✗ 500 | ✗ 500 | All queries fail |
+| MULTIPARC | ✓ | ✓ | Fully working |
+| KIDS | ✓ | ✗ 500 | `author_gender` filter fails |
+| CLASSICS | ✓ | ✓ | Fully working |
+| BLOGS | ✗ 500 | ✗ 500 | All queries fail |
+
+**Fully working corpora (7):** MAIN, PAPER, SPOKEN, SCHOOL, MULTIPARC, CLASSICS, plus MULTI (with subcorpus only)
+
+**Broken corpora (5):** POETIC, SYNTAX, ACCENT, BLOGS - all queries return 500
+
+**Partially working (2):**
+- DIALECT: Simple queries work, `author_gender` filter fails
+- KIDS: Simple queries work, `author_gender` filter fails
+
+**Special case:**
+- MULTI: Simple queries fail with 500, but queries with `author_gender` filter work
+
 ### Manual Testing with FastMCP Client
 
 For manual testing against a running server, use the FastMCP client library. Start the server first with `python3 main.py`.

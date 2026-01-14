@@ -23,6 +23,12 @@ pytest
 ```bash
 # Unit tests only
 pytest -m unit
+
+# E2E tests only (requires server running on localhost:8000)
+pytest -m e2e
+
+# E2E tests against remote server
+E2E_SERVER_URL=http://remote-server:8000/mcp pytest -m e2e
 ```
 
 ### Run Specific Test Files
@@ -69,25 +75,28 @@ tests/
 ├── conftest.py                    # Shared fixtures
 ├── pytest.ini                     # Configuration
 │
-├── unit/                          # Unit tests
+├── unit/                          # Unit tests (mocked)
 │   ├── test_config.py            # Config validation
 │   ├── test_schemas.py           # Pydantic schemas
 │   ├── services/
-│   │   ├── test_builder.py       # Query building logic
-│   │   └── test_formatter.py     # Response formatting
+│   │   ├── test_rnc_builder.py   # Query building logic
+│   │   └── test_rnc_formatter.py # Response formatting
 │   └── resources/
-│       └── test_generator.py     # Resource generation
+│       └── test_rnc_generator.py # Resource generation
 │
-├── fixtures/                      # Test data
-│   ├── mock_responses.py         # Mock API responses
-│   └── sample_queries.py         # Sample queries
+├── e2e/                           # End-to-end tests (real server)
+│   ├── conftest.py               # E2E configuration
+│   ├── test_concordance.py       # Concordance tool tests
+│   └── test_resources.py         # Resource generation tests
 │
-└── utils/                        # Test utilities
-    └── assertions.py             # Custom assertions
+└── fixtures/                      # Test data
+    ├── mock_responses.py         # Mock API responses
+    └── e2e_queries.py            # Raw JSON query fixtures
 ```
 
 ## Markers
 
 Tests are organized with pytest markers:
 
-- `@pytest.mark.unit` - Unit tests
+- `@pytest.mark.unit` - Unit tests (no network, mocked dependencies)
+- `@pytest.mark.e2e` - End-to-end tests (requires running server)

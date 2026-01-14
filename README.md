@@ -381,7 +381,35 @@ pytest
 
 # Run unit tests only
 pytest -m unit
+
+# Run E2E tests (requires server running on localhost:8000)
+pytest -m e2e
 ```
+
+### E2E Tests
+
+E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code.
+
+```bash
+# Start the server first
+python3 main.py
+
+# In another terminal, run E2E tests
+pytest -m e2e
+```
+
+To test against a remote server, configure the URL via environment variable or `.env.e2e` file:
+
+```bash
+# Via environment variable
+E2E_SERVER_URL=http://remote-server:8000/mcp pytest -m e2e
+
+# Or via .env.e2e file
+echo "E2E_SERVER_URL=http://remote-server:8000/mcp" > .env.e2e
+pytest -m e2e
+```
+
+### Coverage
 
 The project maintains high test coverage. You can view the coverage report by running:
 
