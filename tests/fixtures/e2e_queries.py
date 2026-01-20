@@ -10,6 +10,7 @@ Queries are wrapped in {"query": {...}} as expected by the concordance tool.
 ALL_CORPUS_TYPES = [
     "MAIN", "PAPER", "POETIC", "SPOKEN", "DIALECT", "SCHOOL",
     "SYNTAX", "MULTI", "ACCENT", "MULTIPARC", "KIDS", "CLASSICS", "BLOGS",
+    "PANCHRON", "OLD_RUS", "MID_RUS",
 ]
 
 # ==============================================================================
@@ -477,6 +478,54 @@ BLOGS_WITH_DATE = {
     }
 }
 
+# PANCHRON (Panchronic)
+PANCHRON_SIMPLE = {
+    "query": {
+        "corpus": "PANCHRON",
+        "tokens": [{"lemma": "хлеб"}],
+    }
+}
+
+PANCHRON_WITH_DATE = {
+    "query": {
+        "corpus": "PANCHRON",
+        "tokens": [{"lemma": "хлеб"}],
+        "subcorpus": {"date_range": {"start_year": 1700, "end_year": 1900}},
+    }
+}
+
+# OLD_RUS (Old East Slavic)
+OLD_RUS_SIMPLE = {
+    "query": {
+        "corpus": "OLD_RUS",
+        "tokens": [{"lemma": "сынъ"}],
+    }
+}
+
+OLD_RUS_WITH_DATE = {
+    "query": {
+        "corpus": "OLD_RUS",
+        "tokens": [{"lemma": "сынъ"}],
+        "subcorpus": {"date_range": {"start_year": 1200, "end_year": 1300}},
+    }
+}
+
+# MID_RUS (Middle Russian)
+MID_RUS_SIMPLE = {
+    "query": {
+        "corpus": "MID_RUS",
+        "tokens": [{"lemma": "прудъ"}],
+    }
+}
+
+MID_RUS_WITH_DATE = {
+    "query": {
+        "corpus": "MID_RUS",
+        "tokens": [{"lemma": "прудъ"}],
+        "subcorpus": {"date_range": {"start_year": 1600, "end_year": 1700}},
+    }
+}
+
 # ==============================================================================
 # Zero-Result Edge Cases
 # ==============================================================================
@@ -513,6 +562,9 @@ SIMPLE_QUERIES = {
     "KIDS": KIDS_SIMPLE,
     "CLASSICS": CLASSICS_SIMPLE,
     "BLOGS": BLOGS_SIMPLE,
+    "PANCHRON": PANCHRON_SIMPLE,
+    "OLD_RUS": OLD_RUS_SIMPLE,
+    "MID_RUS": MID_RUS_SIMPLE,
 }
 
 SUBCORPUS_QUERIES = {
@@ -529,6 +581,9 @@ SUBCORPUS_QUERIES = {
     "KIDS": KIDS_WITH_GENDER,
     "CLASSICS": CLASSICS_WITH_DATE_GENDER,
     "BLOGS": BLOGS_WITH_DATE,
+    "PANCHRON": PANCHRON_WITH_DATE,
+    "OLD_RUS": OLD_RUS_WITH_DATE,
+    "MID_RUS": MID_RUS_WITH_DATE,
 }
 
 ZERO_RESULT_QUERIES = [

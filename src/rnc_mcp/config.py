@@ -26,7 +26,10 @@ class Config:
         "MULTIPARC": "MultiPARC",
         "KIDS": "From 2 to 15",
         "CLASSICS": "Russian classics",
-        "BLOGS": "Social networks"
+        "BLOGS": "Social networks",
+        "PANCHRON": "Panchronic",
+        "OLD_RUS": "Old East Slavic",
+        "MID_RUS": "Middle Russian"
     }
 
     @classmethod

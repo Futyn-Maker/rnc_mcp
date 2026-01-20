@@ -108,7 +108,7 @@ E2E_SERVER_URL=http://127.0.0.1:8000/mcp
 ```
 
 E2E test files:
-- **tests/e2e/test_concordance.py**: Concordance tool tests for all 13 corpora
+- **tests/e2e/test_concordance.py**: Concordance tool tests for all 16 corpora
 - **tests/e2e/test_resources.py**: Resource generation tests for all corpora
 - **tests/fixtures/e2e_queries.py**: Raw JSON query fixtures
 
@@ -131,10 +131,13 @@ Based on E2E tests, here is the current status of each corpus. All corpora suppo
 | KIDS | ✓ | ✗ 500 | `author_gender` filter fails |
 | CLASSICS | ✓ | ✓ | Fully working |
 | BLOGS | ✗ 500 | ✗ 500 | All queries fail |
+| PANCHRON | ✗ 500 | ✗ 500 | All queries fail |
+| OLD_RUS | ✓ | ✓ | Fully working |
+| MID_RUS | ✓ | ✓ | Fully working |
 
-**Fully working corpora (7):** MAIN, PAPER, SPOKEN, SCHOOL, MULTIPARC, CLASSICS, plus MULTI (with subcorpus only)
+**Fully working corpora (9):** MAIN, PAPER, SPOKEN, SCHOOL, MULTIPARC, CLASSICS, OLD_RUS, MID_RUS, plus MULTI (with subcorpus only)
 
-**Broken corpora (5):** POETIC, SYNTAX, ACCENT, BLOGS - all queries return 500
+**Broken corpora (5):** POETIC, SYNTAX, ACCENT, BLOGS, PANCHRON - all queries return 500
 
 **Partially working (2):**
 - DIALECT: Simple queries work, `author_gender` filter fails
@@ -209,3 +212,30 @@ asyncio.run(simple_search())
 - `result.data` - Pydantic models created by FastMCP (nested `Root` objects)
 - `result.content` - Raw content list
 - `result.is_error` - Boolean indicating if the call failed
+
+## Adding New Corpora
+
+To add a new corpus to the wrapper:
+
+1. **Find the corpus type** in [RNC OpenAPI spec](https://ruscorpora.github.io/public-api/openapi/index.html) — look for `corpusType` enum values
+
+2. **Add to config** in `src/rnc_mcp/config.py`:
+   ```python
+   RNC_CORPORA: Dict[str, str] = {
+       # ... existing corpora ...
+       "NEW_TYPE": "Human-readable description",
+   }
+   ```
+
+3. **Add E2E test queries** in `tests/fixtures/e2e_queries.py`:
+   - Add corpus to `ALL_CORPUS_TYPES` list
+   - Create `NEW_TYPE_SIMPLE` and `NEW_TYPE_WITH_DATE` (or other filter) queries
+   - Add entries to `SIMPLE_QUERIES` and `SUBCORPUS_QUERIES` dicts
+
+4. **Run tests** to verify functionality:
+   ```bash
+   python3 main.py &                    # start server
+   pytest -m e2e -k "NEW_TYPE" -v       # run corpus-specific tests
+   ```
+
+5. **Update documentation** — add corpus status to the table in `CLAUDE.md`
