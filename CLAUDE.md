@@ -120,30 +120,27 @@ Based on E2E tests, here is the current status of each corpus. All corpora suppo
 |--------|--------------|------------------|-------|
 | MAIN | ✓ | ✓ | Fully working |
 | PAPER | ✓ | ✓ | Fully working |
-| POETIC | ✗ 500 | ✗ 500 | All queries fail |
+| POETIC | ✓ | ✓ | Fully working |
 | SPOKEN | ✓ | ✓ | Fully working |
 | DIALECT | ✓ | ✗ 500 | `author_gender` filter fails |
 | SCHOOL | ✓ | ✓ | Fully working |
-| SYNTAX | ✗ 500 | ✗ 500 | All queries fail |
+| SYNTAX | ✗ 500 | ✗ 500 | Simple lemma queries fail |
 | MULTI | ✗ 500 | ✓ | Simple fails, `author_gender` works |
-| ACCENT | ✗ 500 | ✗ 500 | All queries fail |
+| ACCENT | ✓ | ✓ | Fully working |
 | MULTIPARC | ✓ | ✓ | Fully working |
 | KIDS | ✓ | ✗ 500 | `author_gender` filter fails |
 | CLASSICS | ✓ | ✓ | Fully working |
-| BLOGS | ✗ 500 | ✗ 500 | All queries fail |
-| PANCHRON | ✗ 500 | ✗ 500 | All queries fail |
+| BLOGS | ✓ | ✓ | Fully working |
+| PANCHRON | ✓ | ✓ | Fully working |
 | OLD_RUS | ✓ | ✓ | Fully working |
 | MID_RUS | ✓ | ✓ | Fully working |
 
-**Fully working corpora (9):** MAIN, PAPER, SPOKEN, SCHOOL, MULTIPARC, CLASSICS, OLD_RUS, MID_RUS, plus MULTI (with subcorpus only)
+**Fully working corpora (12):** MAIN, PAPER, POETIC, SPOKEN, SCHOOL, ACCENT, MULTIPARC, CLASSICS, BLOGS, PANCHRON, OLD_RUS, MID_RUS
 
-**Broken corpora (5):** POETIC, SYNTAX, ACCENT, BLOGS, PANCHRON - all queries return 500
-
-**Partially working (2):**
-- DIALECT: Simple queries work, `author_gender` filter fails
-- KIDS: Simple queries work, `author_gender` filter fails
-
-**Special case:**
+**Partially working (4):**
+- DIALECT: Simple queries work, `author_gender` filter fails with 500
+- KIDS: Simple queries work, `author_gender` filter fails with 500
+- SYNTAX: Simple lemma queries fail with 500, but syntax tag queries on MAIN corpus work
 - MULTI: Simple queries fail with 500, but queries with `author_gender` filter work
 
 ### Manual Testing with FastMCP Client
