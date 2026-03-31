@@ -18,6 +18,9 @@ class Config:
     RNC_MAX_RETRIES: int = int(
         os.getenv("RNC_MAX_RETRIES", "3")
     )
+    RNC_AUTH_CACHE_TTL: float = float(
+        os.getenv("RNC_AUTH_CACHE_TTL", "300")
+    )
 
     RNC_CORPORA: Dict[str, str] = {
         "MAIN": "Main",
@@ -48,10 +51,10 @@ class Config:
             )
         return cls._RNC_TOKEN
 
-    @classmethod
-    def rnc_headers(cls) -> dict:
+    @staticmethod
+    def rnc_headers(token: str) -> dict:
         return {
-            "Authorization": f"Bearer {cls.get_rnc_token()}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
             "Accept": "application/json"
         }

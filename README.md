@@ -6,6 +6,7 @@ The server abstracts the complexity of the raw RNC API, providing a streamlined 
 
 ## Features
 
+* **Per-User Authentication:** Each connecting client provides their own RNC API token via bearer auth. Tokens are validated against the RNC API and cached with a configurable TTL.
 * **Zero-Code Integration:** Connects seamlessly to any MCP-compliant client (Claude Web or Desktop, IDEs, etc.).
 * **Concordance Search:** Powerful querying capabilities including lemmas, exact word forms, grammar tags, semantic tags, and syntactic roles.
 * **Multi-Page Collection:** Automatically fetch hundreds of examples across multiple pages with a single tool call by setting `max_examples`, with built-in retry logic and rate-limit protection.
@@ -24,18 +25,26 @@ You must have a valid API token from the Russian National Corpus.
 
 Create a `.env` file in the project root (you can copy `.env.example` as a template).
 
+#### HTTP transport (multi-user, recommended)
+
+No `RNC_API_TOKEN` is required on the server side. Each connecting client provides their own RNC API token via bearer auth (`Authorization: Bearer <token>`). The server validates it against the RNC API on first use and caches the result.
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `RNC_API_TOKEN` | Yes | — | API token from [RNC profile](https://ruscorpora.ru/accounts/profile/for-devs) |
+| `RNC_API_TOKEN` | No | — | Not used in HTTP mode. Users provide their own tokens via bearer auth |
 | `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
 | `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
+| `RNC_AUTH_CACHE_TTL` | No | `300` | How long validated tokens are cached, in seconds |
 
-```bash
-RNC_API_TOKEN=your_token_here
-# Optional: tune multi-page fetching behavior
-# RNC_PAGE_DELAY=0.5
-# RNC_MAX_RETRIES=3
-```
+#### STDIO transport (local usage)
+
+When using STDIO transport (e.g., via IDE integration), there is no auth mechanism. The server reads the token from the `RNC_API_TOKEN` environment variable.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RNC_API_TOKEN` | **Yes** | — | API token from [RNC profile](https://ruscorpora.ru/accounts/profile/for-devs) |
+| `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
+| `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
 
 ### 3. Running the Server
 
@@ -61,6 +70,7 @@ Allows for flexible transport configuration.
 
 ```bash
 # Standard Input/Output (stdio) - best for IDEs/Claude Desktop
+# Requires RNC_API_TOKEN environment variable
 fastmcp run main.py
 
 # HTTP Transport with custom port
@@ -228,6 +238,8 @@ Reading these resources provides Markdown-formatted documentation of available s
 
 You can use the `fastmcp` client library to interact with this server programmatically using Python. This is useful for testing queries or building custom applications.
 
+All client connections require a bearer token (`auth=` parameter). Get your token at [https://ruscorpora.ru/accounts/profile/for-devs](https://ruscorpora.ru/accounts/profile/for-devs).
+
 ### Listing Available Tools and Resources
 
 Before making queries, you can discover what tools and resources the server provides.
@@ -236,15 +248,17 @@ Before making queries, you can discover what tools and resources the server prov
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def list_tools():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         tools = await client.list_tools()
         print("Available tools:")
         for tool in tools:
             print(f"  - {tool.name}: {tool.description}")
 
 async def list_resources():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         resources = await client.list_resources()
         print("Available resources:")
         for resource in resources:
@@ -263,9 +277,11 @@ This example shows how to connect to the running server and fetch dynamic resour
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def get_corpus_info():
     # Connect to the HTTP server (note: /mcp endpoint)
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
 
         # Check connection
         await client.ping()
@@ -289,8 +305,10 @@ A basic example searching for the lemma *дом* (house) in the main corpus.
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def simple_search():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
 
         # Call the concordance tool with a query parameter
         # The query must be wrapped in {"query": {...}}
@@ -331,8 +349,10 @@ An advanced example demonstrating multi-token search with distance constraints, 
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def complex_search():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
 
         # Complex query:
         # Find a Verb (gramm="V") with lemma *идти* (to go)
@@ -390,8 +410,10 @@ When you need many examples for corpus research, set `max_examples` to automatic
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def collect_examples():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
 
         # Collect 500 usage examples of the word "дом"
         # The server will fetch multiple pages automatically
@@ -443,7 +465,14 @@ pytest -m e2e
 
 ### E2E Tests
 
-E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code.
+E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code. The client authenticates with a bearer token.
+
+Configuration via `.env.e2e` file (separate from main `.env`). Copy `.env.e2e.example` to `.env.e2e`:
+
+```bash
+RNC_API_TOKEN=your_token_here
+# E2E_SERVER_URL=http://127.0.0.1:8000/mcp
+```
 
 ```bash
 # Start the server first
@@ -453,15 +482,10 @@ python3 main.py
 pytest -m e2e
 ```
 
-To test against a remote server, configure the URL via environment variable or `.env.e2e` file:
+To test against a remote server, set `E2E_SERVER_URL` in `.env.e2e`:
 
 ```bash
-# Via environment variable
-E2E_SERVER_URL=http://remote-server:8000/mcp pytest -m e2e
-
-# Or via .env.e2e file
-echo "E2E_SERVER_URL=http://remote-server:8000/mcp" > .env.e2e
-pytest -m e2e
+E2E_SERVER_URL=http://remote-server:8000/mcp
 ```
 
 ### Coverage

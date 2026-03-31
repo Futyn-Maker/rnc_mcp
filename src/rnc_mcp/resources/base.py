@@ -12,6 +12,6 @@ class CorpusResourceGenerator(ABC):
         self.client = client
 
     @abstractmethod
-    async def generate(self, corpus: str) -> str:
+    async def generate(self, corpus: str, token: str) -> str:
         """Generate a resource description string."""
         pass

@@ -13,13 +13,17 @@ class RNCClient(CorpusClient):
 
     @measure_time
     async def execute_concordance(
-            self, payload: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+            self, payload: Dict[str, Any],
+            token: str, **kwargs
+    ) -> Dict[str, Any]:
+        async with httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=True
+        ) as client:
             try:
                 response = await client.post(
                     f"{Config.RNC_BASE_URL}/lex-gramm/concordance",
                     json=payload,
-                    headers=Config.rnc_headers()
+                    headers=Config.rnc_headers(token)
                 )
                 response.raise_for_status()
                 return response.json()
@@ -32,19 +36,24 @@ class RNCClient(CorpusClient):
                         e.response.status_code}: {
                         e.response.text}")
 
-    async def get_corpus_config(self, corpus_type: str) -> Dict[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout, follow_redirects=True) as client:
+    async def get_corpus_config(
+            self, corpus_type: str,
+            token: str) -> Dict[str, Any]:
+        async with httpx.AsyncClient(
+            timeout=self.timeout, follow_redirects=True
+        ) as client:
             params = {"corpus": json.dumps({"type": corpus_type})}
             response = await client.get(
                 f"{Config.RNC_BASE_URL}/config/",
                 params=params,
-                headers=Config.rnc_headers()
+                headers=Config.rnc_headers(token)
             )
             response.raise_for_status()
             return response.json()
 
     async def get_attributes(
-        self, corpus_type: str, attr_type: str
+        self, corpus_type: str, attr_type: str,
+        token: str,
     ) -> Dict[str, Any]:
         async with httpx.AsyncClient(
             timeout=self.timeout, follow_redirects=True
@@ -53,7 +62,7 @@ class RNCClient(CorpusClient):
             response = await client.get(
                 f"{Config.RNC_BASE_URL}/attrs/{attr_type}",
                 params=params,
-                headers=Config.rnc_headers()
+                headers=Config.rnc_headers(token)
             )
             response.raise_for_status()
             return response.json()

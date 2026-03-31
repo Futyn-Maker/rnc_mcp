@@ -53,31 +53,32 @@ class TestConfig:
 
         assert "RNC_API_TOKEN is not set" in str(exc_info.value)
 
-    def test_headers_includes_bearer_token(self, mock_env_token):
+    def test_headers_includes_bearer_token(self):
         """Test headers() includes Bearer authorization."""
-        headers = Config.rnc_headers()
+        token = "test_token_abc"
+        headers = Config.rnc_headers(token)
 
         assert "Authorization" in headers
-        assert headers["Authorization"] == f"Bearer {mock_env_token}"
+        assert headers["Authorization"] == f"Bearer {token}"
         assert headers["Authorization"].startswith("Bearer ")
 
-    def test_headers_includes_content_type(self, mock_env_token):
+    def test_headers_includes_content_type(self):
         """Test headers() includes correct content-type."""
-        headers = Config.rnc_headers()
+        headers = Config.rnc_headers("any_token")
 
         assert "Content-Type" in headers
         assert headers["Content-Type"] == "application/json"
 
-    def test_headers_includes_accept(self, mock_env_token):
+    def test_headers_includes_accept(self):
         """Test headers() includes accept header."""
-        headers = Config.rnc_headers()
+        headers = Config.rnc_headers("any_token")
 
         assert "Accept" in headers
         assert headers["Accept"] == "application/json"
 
-    def test_headers_structure(self, mock_env_token):
+    def test_headers_structure(self):
         """Test that headers() returns complete structure."""
-        headers = Config.rnc_headers()
+        headers = Config.rnc_headers("any_token")
 
         assert isinstance(headers, dict)
         assert len(headers) == 3

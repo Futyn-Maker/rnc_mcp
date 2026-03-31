@@ -11,6 +11,8 @@ from tests.fixtures.mock_responses import (
     make_multipage_response,
 )
 
+TOKEN = "test_token"
+
 
 @pytest.fixture
 def mock_ctx():
@@ -45,12 +47,10 @@ class TestCollectExamplesBasic:
     """Basic multi-page collection tests."""
 
     async def test_single_page_sufficient(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Stop after one page when enough examples."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         # 2 docs * 2 snippets = 4 examples per page
@@ -62,10 +62,14 @@ class TestCollectExamplesBasic:
         )
 
         result = await _collect_examples(
-            _query(max_examples=4), mock_client, mock_ctx
+            _query(max_examples=4),
+            mock_client, mock_ctx, TOKEN,
         )
 
-        assert mock_client.execute_concordance.call_count == 1
+        assert (
+            mock_client.execute_concordance.call_count
+            == 1
+        )
         total = sum(
             len(d.examples) for d in result.results
         )
@@ -73,12 +77,10 @@ class TestCollectExamplesBasic:
         assert result.stats.last_page_fetched == 0
 
     async def test_multi_page_collection(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Fetch multiple pages to reach max_examples."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         # 2 docs * 2 snippets = 4 examples per page
@@ -95,10 +97,14 @@ class TestCollectExamplesBasic:
         )
 
         result = await _collect_examples(
-            _query(max_examples=10), mock_client, mock_ctx
+            _query(max_examples=10),
+            mock_client, mock_ctx, TOKEN,
         )
 
-        assert mock_client.execute_concordance.call_count == 3
+        assert (
+            mock_client.execute_concordance.call_count
+            == 3
+        )
         total = sum(
             len(d.examples) for d in result.results
         )
@@ -106,12 +112,10 @@ class TestCollectExamplesBasic:
         assert result.stats.last_page_fetched == 2
 
     async def test_start_from_nonzero_page(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Respect starting page parameter."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         def side_effect(payload, **kwargs):
@@ -127,7 +131,7 @@ class TestCollectExamplesBasic:
 
         result = await _collect_examples(
             _query(max_examples=4, page=3),
-            mock_client, mock_ctx,
+            mock_client, mock_ctx, TOKEN,
         )
 
         # Should start from page 3
@@ -136,7 +140,9 @@ class TestCollectExamplesBasic:
             .call_args_list[0][0][0]
         )
         assert (
-            first_call_payload["params"]["pageParams"]["page"]
+            first_call_payload[
+                "params"
+            ]["pageParams"]["page"]
             == 3
         )
         assert result.stats.last_page_fetched == 3
@@ -148,12 +154,10 @@ class TestCollectExamplesTrimming:
     """Tests for example trimming at boundaries."""
 
     async def test_trims_excess_examples(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Trim examples in last doc to not exceed max."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         # 2 docs * 3 snippets = 6 per page, want 5
@@ -165,7 +169,8 @@ class TestCollectExamplesTrimming:
         )
 
         result = await _collect_examples(
-            _query(max_examples=5), mock_client, mock_ctx
+            _query(max_examples=5),
+            mock_client, mock_ctx, TOKEN,
         )
 
         total = sum(
@@ -177,12 +182,11 @@ class TestCollectExamplesTrimming:
         assert len(result.results[1].examples) == 2
 
     async def test_stops_at_exact_boundary(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
-        """No trimming needed when examples match exactly."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
+        """No trimming needed when examples match
+        exactly."""
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         # 2 docs * 2 snippets = 4 per page, want 4
@@ -194,14 +198,18 @@ class TestCollectExamplesTrimming:
         )
 
         result = await _collect_examples(
-            _query(max_examples=4), mock_client, mock_ctx
+            _query(max_examples=4),
+            mock_client, mock_ctx, TOKEN,
         )
 
         total = sum(
             len(d.examples) for d in result.results
         )
         assert total == 4
-        assert mock_client.execute_concordance.call_count == 1
+        assert (
+            mock_client.execute_concordance.call_count
+            == 1
+        )
 
 
 @pytest.mark.unit
@@ -210,12 +218,10 @@ class TestCollectExamplesExhaustion:
     """Tests for when results are exhausted."""
 
     async def test_stops_at_last_page(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Stop when all pages are exhausted."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         # 3 pages * 2 docs * 1 snippet = 6 total
@@ -232,10 +238,14 @@ class TestCollectExamplesExhaustion:
         )
 
         result = await _collect_examples(
-            _query(max_examples=100), mock_client, mock_ctx
+            _query(max_examples=100),
+            mock_client, mock_ctx, TOKEN,
         )
 
-        assert mock_client.execute_concordance.call_count == 3
+        assert (
+            mock_client.execute_concordance.call_count
+            == 3
+        )
         total = sum(
             len(d.examples) for d in result.results
         )
@@ -249,18 +259,11 @@ class TestCollectExamplesRetry:
     """Tests for retry logic on failures."""
 
     async def test_retry_then_success(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Retry a failed request and continue."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
-
-        page0 = make_multipage_response(
-            page=0, total_pages=5,
-            docs_per_page=2, snippets_per_doc=2,
-        )
 
         # Fail once on page 1, then succeed
         call_count = {"n": 0}
@@ -280,23 +283,26 @@ class TestCollectExamplesRetry:
         )
 
         result = await _collect_examples(
-            _query(max_examples=8), mock_client, mock_ctx
+            _query(max_examples=8),
+            mock_client, mock_ctx, TOKEN,
         )
 
         # page 0 ok, page 1 fail, page 1 retry ok
-        assert mock_client.execute_concordance.call_count == 3
+        assert (
+            mock_client.execute_concordance.call_count
+            == 3
+        )
         total = sum(
             len(d.examples) for d in result.results
         )
         assert total == 8
 
     async def test_three_consecutive_failures_returns_partial(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
-        """Return partial results after 3 consecutive fails."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
+        """Return partial results after 3 consecutive
+        fails."""
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
         Config.RNC_MAX_RETRIES = 3
 
@@ -317,11 +323,15 @@ class TestCollectExamplesRetry:
         )
 
         result = await _collect_examples(
-            _query(max_examples=100), mock_client, mock_ctx
+            _query(max_examples=100),
+            mock_client, mock_ctx, TOKEN,
         )
 
         # page 0 ok (1 call), page 1 fails 3 times
-        assert mock_client.execute_concordance.call_count == 4
+        assert (
+            mock_client.execute_concordance.call_count
+            == 4
+        )
         total = sum(
             len(d.examples) for d in result.results
         )
@@ -329,12 +339,11 @@ class TestCollectExamplesRetry:
         assert result.stats.last_page_fetched == 0
 
     async def test_all_requests_fail_raises_error(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
-        """Raise RuntimeError when no data is collected."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
+        """Raise RuntimeError when no data is
+        collected."""
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
         Config.RNC_MAX_RETRIES = 3
 
@@ -342,10 +351,12 @@ class TestCollectExamplesRetry:
             RuntimeError("Always fails")
         )
 
-        with pytest.raises(RuntimeError, match="Failed"):
+        with pytest.raises(
+            RuntimeError, match="Failed"
+        ):
             await _collect_examples(
                 _query(max_examples=10),
-                mock_client, mock_ctx,
+                mock_client, mock_ctx, TOKEN,
             )
 
 
@@ -355,12 +366,10 @@ class TestCollectExamplesPayload:
     """Tests for payload overrides."""
 
     async def test_overrides_docs_per_page(
-        self, mock_client, mock_ctx, monkeypatch
+        self, mock_client, mock_ctx
     ):
         """Ensure docsPerPage is overridden to 50."""
-        monkeypatch.setenv("RNC_API_TOKEN", "tok")
         from rnc_mcp.config import Config
-        Config._RNC_TOKEN = "tok"
         Config.RNC_PAGE_DELAY = 0
 
         mock_client.execute_concordance.return_value = (
@@ -371,7 +380,8 @@ class TestCollectExamplesPayload:
         )
 
         await _collect_examples(
-            _query(max_examples=1), mock_client, mock_ctx
+            _query(max_examples=1),
+            mock_client, mock_ctx, TOKEN,
         )
 
         payload = (

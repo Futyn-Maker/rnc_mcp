@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Model Context Protocol (MCP) server that connects LLMs to the Russian National Corpus (RNC) API. Built with FastMCP, it exposes a `concordance` tool for lexicographic searches and dynamic resources for corpus configuration.
 
+The server supports per-user authentication: each connecting client provides their own RNC API token via bearer auth. Tokens are validated against the RNC API's `/auth/check-authenticated/` endpoint and cached with a configurable TTL.
+
 ## Commands
 
 ```bash
@@ -30,19 +32,32 @@ pytest --cov=src/rnc_mcp --cov-report=term-missing
 
 ## Environment Setup
 
-Requires `RNC_API_TOKEN` environment variable. Get token from: https://ruscorpora.ru/accounts/profile/for-devs
+### HTTP transport (multi-user)
 
-Optional variables for multi-page fetching:
+No `RNC_API_TOKEN` is required on the server. Each connecting client provides their own RNC API token via bearer auth (`Authorization: Bearer <token>`). The server validates it against the RNC API on first use and caches the result.
+
+Optional variables:
 - `RNC_PAGE_DELAY` — delay in seconds between page requests (default: `0.5`)
 - `RNC_MAX_RETRIES` — consecutive failures before aborting multi-page fetch (default: `3`)
+- `RNC_AUTH_CACHE_TTL` — how long validated tokens are cached, in seconds (default: `300`)
+
+### STDIO transport (local usage)
+
+Requires `RNC_API_TOKEN` environment variable since STDIO has no auth mechanism. Get token from: https://ruscorpora.ru/accounts/profile/for-devs
+
+The auth layer is not active in STDIO mode — `get_access_token()` returns `None`, and the server falls back to the env var token.
 
 ## Architecture
 
 ```
 src/rnc_mcp/
-├── mcp.py              # FastMCP server entry point, registers tool & resources, multi-page collection
-├── config.py           # Config singleton (token, base URL, corpus types, page delay, max retries)
+├── mcp.py              # FastMCP server entry point, registers tool & resources, multi-page collection, token resolution
+├── config.py           # Config singleton (base URL, corpus types, page delay, max retries, auth cache TTL)
 ├── schemas/schemas.py  # Pydantic models for request/response (SearchQuery, ConcordanceResponse)
+├── auth/
+│   ├── base.py         # TokenValidator abstract base class
+│   ├── rnc_validator.py # RNCTokenValidator: validates tokens via RNC API with TTL cache
+│   └── rnc_provider.py # RNCAuthProvider: FastMCP TokenVerifier subclass, bridges to TokenValidator
 ├── clients/
 │   ├── base.py         # CorpusClient abstract base class
 │   └── rnc_client.py   # HTTP client implementation using httpx
@@ -56,20 +71,61 @@ src/rnc_mcp/
 └── exceptions.py       # RNCError hierarchy (Config, Auth, API errors)
 ```
 
+## Authentication Flow
+
+### HTTP transport
+
+```
+Client connects with Authorization: Bearer <RNC_API_TOKEN>
+        │
+        ▼
+RNCAuthProvider.verify_token(token)
+  → RNCTokenValidator.validate(token)
+    → checks in-memory TTL cache
+    → on cache miss: GET /api/v1/auth/check-authenticated/ with token
+    → caches result for RNC_AUTH_CACHE_TTL seconds
+  → returns AccessToken (with raw token) or None
+        │
+        ▼
+Tool/Resource handler calls _get_user_token()
+  → get_access_token() returns AccessToken from auth context
+  → extracts .token (the raw bearer token)
+  → passes it to RNCClient methods
+        │
+        ▼
+RNCClient uses the user's token in Authorization header
+```
+
+### STDIO transport
+
+```
+_get_user_token()
+  → get_access_token() returns None (no auth in STDIO)
+  → falls back to Config.get_rnc_token() (from RNC_API_TOKEN env var)
+```
+
+### Key design decisions
+
+- **No token storage**: tokens are never persisted. The in-memory cache only stores validation results (`{token: (is_valid, timestamp)}`).
+- **User token isolation**: in HTTP mode, `RNC_API_TOKEN` env var is never used — even if set, `_get_user_token()` prioritizes the auth context.
+- **Abstract base classes**: `TokenValidator` (domain interface) is decoupled from `RNCAuthProvider` (FastMCP integration), following the same pattern as `CorpusClient`/`RNCClient` and `CorpusResourceGenerator`/`RNCResourceGenerator`.
+
 ## Data Flow
 
 ### Single-page (default)
 
 1. **Tool call**: `concordance(SearchQuery)` receives Pydantic-validated query
-2. **Build**: `RNCQueryBuilder.build_payload()` converts to RNC API JSON format
-3. **Execute**: `RNCClient.execute_concordance()` makes HTTP POST to RNC API
-4. **Format**: `RNCResponseFormatter.format_search_results()` parses response into `ConcordanceResponse`
+2. **Token**: `_get_user_token()` resolves the user's RNC API token from auth context or env var
+3. **Build**: `RNCQueryBuilder.build_payload()` converts to RNC API JSON format
+4. **Execute**: `RNCClient.execute_concordance(payload, token)` makes HTTP POST to RNC API with the user's token
+5. **Format**: `RNCResponseFormatter.format_search_results()` parses response into `ConcordanceResponse`
 
 ### Multi-page (when `max_examples` is set)
 
 1. **Tool call**: `concordance(SearchQuery)` detects `max_examples` is set and delegates to `_collect_examples()`
-2. **Build**: `RNCQueryBuilder.build_payload()` builds the base payload; `docsPerPage` is overridden to 50, `snippetsPerDoc` to 10
-3. **Loop**: For each page starting from `query.page`:
+2. **Token**: resolved once and passed through the entire collection loop
+3. **Build**: `RNCQueryBuilder.build_payload()` builds the base payload; `docsPerPage` is overridden to 50, `snippetsPerDoc` to 10
+4. **Loop**: For each page starting from `query.page`:
    - **Execute**: `RNCClient.execute_concordance()` fetches one page
    - **Format**: `RNCResponseFormatter.format_search_results()` parses the page
    - **Accumulate**: Documents are appended to results; total examples (snippets) are counted
@@ -77,7 +133,7 @@ src/rnc_mcp/
    - **Stop conditions**: `max_examples` reached, all pages exhausted, or `RNC_MAX_RETRIES` consecutive failures
    - **Retry**: On error, the same page is retried up to `RNC_MAX_RETRIES` times; counter resets on success
    - **Delay**: `RNC_PAGE_DELAY` seconds between requests
-4. **Return**: Single `ConcordanceResponse` with merged results and stats from the first page; `last_page_fetched` indicates the last successfully fetched page
+5. **Return**: Single `ConcordanceResponse` with merged results and stats from the first page; `last_page_fetched` indicates the last successfully fetched page
 
 The RNC API hard-caps `docsPerPage` at 50; requesting more still returns 50.
 
@@ -95,16 +151,18 @@ The `@measure_time` decorator in `utils.py` automatically logs execution time vi
 - `TokenRequest`: Search token with lemma, wordform, gramm, semantic, syntax, flags, distance
 - `SubcorpusFilter`: Filter by author, title, date range, gender, disambiguation mode
 - `ConcordanceResponse`: Output with stats (corpus/query/subcorpus counts, `last_page_fetched`) and document results
+- `AccessToken` (from FastMCP): Contains the raw bearer token (`.token`), `client_id`, `scopes`
 
 ## Testing
 
 Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`:
-- `mock_env_token`: Sets mock RNC_API_TOKEN
+- `mock_env_token`: Sets mock RNC_API_TOKEN (used by config tests)
 - `mock_rnc_client`: AsyncMock of RNCClient
 - Sample queries and responses in `tests/fixtures/`
 
 ### Unit Tests
 
+- **test_auth.py**: Token validation (valid/invalid/empty/network error), TTL cache (hit/miss/expiry/storage), RNCAuthProvider (AccessToken creation, empty/whitespace rejection)
 - **test_config.py**: Config validation, token retrieval, headers, RncCorpusType enum
 - **test_schemas.py**: Pydantic schema validation for TokenRequest, SubcorpusFilter, SearchQuery, response models
 - **test_schemas_repr.py**: Custom `__str__` representations for schemas
@@ -115,7 +173,7 @@ Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`
 
 ### E2E Tests
 
-E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code.
+E2E tests connect to a running server and execute real requests. They test the server as a "black box" without importing any source code. The client authenticates with a bearer token.
 
 ```bash
 # Run E2E tests (requires server running on localhost:8000)
@@ -125,8 +183,9 @@ pytest -m e2e
 E2E_SERVER_URL=http://remote-server:8000/mcp pytest -m e2e
 ```
 
-Configuration via `.env.e2e` file (separate from main `.env`):
+Configuration via `.env.e2e` file (separate from main `.env`). Copy `.env.e2e.example` to `.env.e2e`:
 ```
+RNC_API_TOKEN=your_token_here
 E2E_SERVER_URL=http://127.0.0.1:8000/mcp
 ```
 
@@ -170,21 +229,25 @@ Based on E2E tests, here is the current status of each corpus. All corpora suppo
 
 For manual testing against a running server, use the FastMCP client library. Start the server first with `python3 main.py`.
 
+All client connections require a bearer token (`auth=` parameter). Get your token at https://ruscorpora.ru/accounts/profile/for-devs
+
 **List available tools and resources:**
 
 ```python
 import asyncio
 from fastmcp import Client
 
+TOKEN = "your_rnc_api_token"
+
 async def list_tools():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         tools = await client.list_tools()
         print("Available tools:")
         for tool in tools:
             print(f"  - {tool.name}: {tool.description}")
 
 async def list_resources():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         resources = await client.list_resources()
         print("Available resources:")
         for resource in resources:
@@ -198,7 +261,7 @@ asyncio.run(list_resources())
 
 ```python
 async def get_corpus_info():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         data = await client.read_resource("rnc://MAIN/info")
         resource = data[0]  # Returns a list, get first element
         print(resource.text)
@@ -210,7 +273,7 @@ asyncio.run(get_corpus_info())
 
 ```python
 async def simple_search():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         # Tool arguments must wrap query in {"query": {...}}
         result = await client.call_tool(
             "concordance",
@@ -231,7 +294,7 @@ asyncio.run(simple_search())
 
 ```python
 async def multi_page_search():
-    async with Client("http://127.0.0.1:8000/mcp") as client:
+    async with Client("http://127.0.0.1:8000/mcp", auth=TOKEN) as client:
         result = await client.call_tool(
             "concordance",
             {

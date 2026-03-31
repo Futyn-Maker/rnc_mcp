@@ -1,14 +1,17 @@
 """Unit tests for CorpusResourceGenerator."""
 
 import pytest
-from unittest.mock import AsyncMock
-from rnc_mcp.resources.rnc_generator import RNCResourceGenerator
+from rnc_mcp.resources.rnc_generator import (
+    RNCResourceGenerator,
+)
 from tests.fixtures.mock_responses import (
     CORPUS_CONFIG_MAIN,
     CORPUS_CONFIG_NO_SORTINGS,
     ATTRIBUTES_GRAMMAR,
     ATTRIBUTES_EMPTY,
 )
+
+TOKEN = "test_token"
 
 
 @pytest.mark.unit
@@ -17,13 +20,20 @@ class TestMarkdownGeneration:
 
     @pytest.mark.asyncio
     async def test_valid_corpus_generates_markdown(
-            self, mock_rnc_client, mock_env_token):
-        """Test that valid corpus generates full markdown."""
-        mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
-        mock_rnc_client.get_attributes.return_value = ATTRIBUTES_GRAMMAR
+            self, mock_rnc_client):
+        """Test that valid corpus generates full
+        markdown."""
+        mock_rnc_client.get_corpus_config.return_value = (
+            CORPUS_CONFIG_MAIN
+        )
+        mock_rnc_client.get_attributes.return_value = (
+            ATTRIBUTES_GRAMMAR
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
         assert isinstance(result, str)
         assert len(result) > 0
@@ -31,65 +41,97 @@ class TestMarkdownGeneration:
 
     @pytest.mark.asyncio
     async def test_sorting_methods_section(
-            self, mock_rnc_client, mock_env_token):
+            self, mock_rnc_client):
         """Test sorting methods section formatting."""
-        mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
-        mock_rnc_client.get_attributes.return_value = ATTRIBUTES_EMPTY
+        mock_rnc_client.get_corpus_config \
+            .return_value = CORPUS_CONFIG_MAIN
+        mock_rnc_client.get_attributes \
+            .return_value = ATTRIBUTES_EMPTY
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
         assert "## Available Sorting Methods" in result
         assert "grcreated" in result
 
     @pytest.mark.asyncio
     async def test_no_sorting_methods_section_skipped(
-            self, mock_rnc_client, mock_env_token):
-        """Test that section is skipped when no sortings."""
-        mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_NO_SORTINGS
-        mock_rnc_client.get_attributes.return_value = ATTRIBUTES_EMPTY
+            self, mock_rnc_client):
+        """Test that section is skipped when no
+        sortings."""
+        mock_rnc_client.get_corpus_config \
+            .return_value = CORPUS_CONFIG_NO_SORTINGS
+        mock_rnc_client.get_attributes \
+            .return_value = ATTRIBUTES_EMPTY
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
-        assert "No sorting methods available" in result or "_No sorting methods_" in result
+        assert (
+            "No sorting methods available" in result
+            or "_No sorting methods_" in result
+        )
 
     @pytest.mark.asyncio
     async def test_grammar_attributes_section(
-            self, mock_rnc_client, mock_env_token):
+            self, mock_rnc_client):
         """Test grammar attributes section."""
-        mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
-        mock_rnc_client.get_attributes.return_value = ATTRIBUTES_GRAMMAR
+        mock_rnc_client.get_corpus_config.return_value = (
+            CORPUS_CONFIG_MAIN
+        )
+        mock_rnc_client.get_attributes.return_value = (
+            ATTRIBUTES_GRAMMAR
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
         assert "## Grammar Tags" in result
 
     @pytest.mark.asyncio
     async def test_missing_attribute_graceful_degradation(
-            self, mock_rnc_client, mock_env_token):
-        """Test graceful degradation when attribute fetch fails."""
-        mock_rnc_client.get_corpus_config.return_value = CORPUS_CONFIG_MAIN
+            self, mock_rnc_client):
+        """Test graceful degradation when attribute
+        fetch fails."""
+        mock_rnc_client.get_corpus_config.return_value = (
+            CORPUS_CONFIG_MAIN
+        )
         # Simulate failure for one attribute type
-        mock_rnc_client.get_attributes.side_effect = Exception("API Error")
+        mock_rnc_client.get_attributes.side_effect = (
+            Exception("API Error")
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
-        # Should still return markdown (not raise exception)
+        # Should still return markdown
         assert isinstance(result, str)
-        assert "_No gr tags available._" in result or "_No sem tags available._" in result
+        assert (
+            "_No gr tags available._" in result
+            or "_No sem tags available._" in result
+        )
 
     @pytest.mark.asyncio
     async def test_always_returns_string(
-            self, mock_rnc_client, mock_env_token):
-        """Test that generator always returns string (never raises)."""
-        mock_rnc_client.get_corpus_config.side_effect = Exception(
-            "Config fetch failed")
+            self, mock_rnc_client):
+        """Test that generator always returns string
+        (never raises)."""
+        mock_rnc_client.get_corpus_config.side_effect = (
+            Exception("Config fetch failed")
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
         assert isinstance(result, str)
         assert "Error loading resource" in result
@@ -100,7 +142,7 @@ class TestOptionFormatting:
     """Tests for option formatting."""
 
     def test_format_leaf_nodes(self):
-        """Test formatting of leaf nodes (no suboptions)."""
+        """Test formatting of leaf nodes."""
         options = [
             {"value": "S", "title": "Существительное"}
         ]
@@ -119,7 +161,10 @@ class TestOptionFormatting:
                 "title": "Существительное",
                 "suboptions": {
                     "options": [
-                        {"value": "nom", "title": "Именительный падеж"}
+                        {
+                            "value": "nom",
+                            "title": "Именительный падеж",
+                        }
                     ]
                 }
             }
@@ -134,13 +179,16 @@ class TestOptionFormatting:
         assert "  " in result  # Indentation
 
     def test_format_category_header_only(self):
-        """Test formatting of category header (no value)."""
+        """Test formatting of category header."""
         options = [
             {
                 "title": "Таксономия",
                 "suboptions": {
                     "options": [
-                        {"value": "t:hum", "title": "Человек"}
+                        {
+                            "value": "t:hum",
+                            "title": "Человек",
+                        }
                     ]
                 }
             }
@@ -165,38 +213,39 @@ class TestErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    async def test_missing_token_returns_error_message(
-            self, mock_rnc_client, clear_env_token):
-        """Test that missing token returns error message string."""
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
-
-        assert isinstance(result, str)
-        assert "Error loading resource" in result
-
-    @pytest.mark.asyncio
     async def test_api_error_on_config_fetch(
-            self, mock_rnc_client, mock_env_token):
-        """Test API error on config fetch returns error message."""
-        mock_rnc_client.get_corpus_config.side_effect = Exception(
-            "Network error")
+            self, mock_rnc_client):
+        """Test API error on config fetch returns error
+        message."""
+        mock_rnc_client.get_corpus_config.side_effect = (
+            Exception("Network error")
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
-        result = await generator.generate("MAIN")
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
+        result = await generator.generate("MAIN", TOKEN)
 
         assert isinstance(result, str)
         assert "Error loading resource" in result
 
     @pytest.mark.asyncio
     async def test_never_raises_exception(
-            self, mock_rnc_client, mock_env_token):
-        """Test that generator never raises exceptions."""
+            self, mock_rnc_client):
+        """Test that generator never raises
+        exceptions."""
         # Simulate all kinds of failures
-        mock_rnc_client.get_corpus_config.side_effect = Exception("Error 1")
-        mock_rnc_client.get_attributes.side_effect = Exception("Error 2")
+        mock_rnc_client.get_corpus_config.side_effect = (
+            Exception("Error 1")
+        )
+        mock_rnc_client.get_attributes.side_effect = (
+            Exception("Error 2")
+        )
 
-        generator = RNCResourceGenerator(mock_rnc_client)
+        generator = RNCResourceGenerator(
+            mock_rnc_client
+        )
 
         # Should not raise
-        result = await generator.generate("MAIN")
+        result = await generator.generate("MAIN", TOKEN)
         assert isinstance(result, str)
