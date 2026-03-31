@@ -271,15 +271,19 @@ To add a new corpus to the wrapper:
    }
    ```
 
-3. **Add E2E test queries** in `tests/fixtures/e2e_queries.py`:
+3. **Update unit tests** in `tests/unit/test_config.py` — increment the corpus count in two tests:
+   - `test_corpora_has_N_entries`: update the expected count in `assert len(Config.RNC_CORPORA) == N`
+   - `test_enum_has_all_N_corpus_types`: update the expected count in `assert len(corpus_types) == N`
+
+4. **Add E2E test queries** in `tests/fixtures/e2e_queries.py`:
    - Add corpus to `ALL_CORPUS_TYPES` list
    - Create `NEW_TYPE_SIMPLE` and `NEW_TYPE_WITH_DATE` (or other filter) queries
    - Add entries to `SIMPLE_QUERIES` and `SUBCORPUS_QUERIES` dicts
 
-4. **Run tests** to verify functionality:
+5. **Run tests** to verify functionality:
    ```bash
    python3 main.py &                    # start server
    pytest -m e2e -k "NEW_TYPE" -v       # run corpus-specific tests
    ```
 
-5. **Update documentation** — add corpus status to the table in `CLAUDE.md`
+6. **Update documentation** — add corpus status to the table in `CLAUDE.md`

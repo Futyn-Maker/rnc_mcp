@@ -14,9 +14,9 @@ class TestConfig:
         """Test that BASE_URL is configured."""
         assert Config.RNC_BASE_URL == "https://ruscorpora.ru/api/v1"
 
-    def test_corpora_has_13_entries(self):
-        """Test that CORPORA dict contains all 13 corpus types."""
-        assert len(Config.RNC_CORPORA) == 13
+    def test_corpora_has_16_entries(self):
+        """Test that CORPORA dict contains all 16 corpus types."""
+        assert len(Config.RNC_CORPORA) == 16
 
     def test_corpora_contains_expected_types(self):
         """Test that CORPORA contains expected corpus codes."""
@@ -89,11 +89,11 @@ class TestConfig:
 class TestRncCorpusType:
     """Tests for dynamically generated RncCorpusType enum."""
 
-    def test_enum_has_all_13_corpus_types(self):
-        """Test that RncCorpusType enum has all 13 corpus types."""
+    def test_enum_has_all_16_corpus_types(self):
+        """Test that RncCorpusType enum has all 16 corpus types."""
         # Get all enum members
         corpus_types = list(RncCorpusType)
-        assert len(corpus_types) == 13
+        assert len(corpus_types) == 16
 
     def test_enum_contains_main(self):
         """Test that MAIN corpus type exists."""
