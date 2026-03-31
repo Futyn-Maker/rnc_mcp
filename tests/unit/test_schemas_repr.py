@@ -52,6 +52,31 @@ class TestStringRepresentations:
         assert "    1. Token[lemma='тест']" in s
         assert "  Subcorpus: author='Пушкин'" in s
 
+    def test_search_query_max_examples_repr(self):
+        """Test query string shows multi-page info."""
+        q = SearchQuery(
+            corpus=RncCorpusType.MAIN,
+            tokens=[TokenRequest(lemma="тест")],
+            max_examples=200,
+            page=3
+        )
+        s = str(q)
+        assert "Multi-page: max 200 examples" in s
+        assert "starting from page 3" in s
+        assert "Page:" not in s
+
+    def test_search_query_single_page_repr(self):
+        """Test query string shows page info without max_examples."""
+        q = SearchQuery(
+            corpus=RncCorpusType.MAIN,
+            tokens=[TokenRequest(lemma="тест")],
+            page=2,
+            per_page=20
+        )
+        s = str(q)
+        assert "Page: 2 (size=20)" in s
+        assert "Multi-page" not in s
+
     def test_empty_subcorpus_repr(self):
         """Test subcorpus string only shows set fields."""
         sc = SubcorpusFilter(author="Толстой")

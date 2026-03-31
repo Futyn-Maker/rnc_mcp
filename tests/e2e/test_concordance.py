@@ -228,5 +228,45 @@ class TestConcordanceResponseStructure:
 
         # At least one of the counts should be positive
         text_count = query_stats.get("textCount", 0) or 0
-        word_count = query_stats.get("wordUsageCount", 0) or 0
-        assert text_count > 0 or word_count > 0, "Expected positive results for 'дом' in MAIN corpus"
+        word_count = (
+            query_stats.get("wordUsageCount", 0) or 0
+        )
+        assert text_count > 0 or word_count > 0, (
+            "Expected positive results for 'дом' in MAIN"
+        )
+
+
+@pytest.mark.e2e
+@pytest.mark.asyncio
+class TestConcordanceMultiPage:
+    """Test multi-page example collection."""
+
+    async def test_collect_500_examples(self, mcp_client):
+        """Collect 500 examples across multiple pages."""
+        from tests.fixtures.e2e_queries import (
+            MULTI_PAGE_500_EXAMPLES,
+        )
+
+        async with mcp_client() as client:
+            result = await client.call_tool(
+                "concordance", MULTI_PAGE_500_EXAMPLES
+            )
+
+        assert not result.is_error, (
+            f"Tool call failed: {result.content}"
+        )
+        data = result.structured_content
+
+        # Count total examples across all documents
+        total_examples = sum(
+            len(doc["examples"])
+            for doc in data["results"]
+        )
+        assert total_examples == 500
+
+        # Stats should be present
+        assert data["stats"]["queryStats"] is not None
+
+        # last_page_fetched should be > 0
+        # (500 examples needs multiple pages)
+        assert data["stats"]["last_page_fetched"] > 0

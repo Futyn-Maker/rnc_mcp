@@ -12,6 +12,12 @@ load_dotenv()
 class Config:
     RNC_BASE_URL: str = "https://ruscorpora.ru/api/v1"
     _RNC_TOKEN: Optional[str] = os.getenv("RNC_API_TOKEN")
+    RNC_PAGE_DELAY: float = float(
+        os.getenv("RNC_PAGE_DELAY", "0.5")
+    )
+    RNC_MAX_RETRIES: int = int(
+        os.getenv("RNC_MAX_RETRIES", "3")
+    )
 
     RNC_CORPORA: Dict[str, str] = {
         "MAIN": "Main",

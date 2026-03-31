@@ -307,6 +307,37 @@ class TestSearchQuery:
         assert query.per_page == 50
         assert query.return_examples is False
 
+    def test_max_examples_default_none(self):
+        """Test that max_examples defaults to None."""
+        query = SearchQuery(
+            tokens=[TokenRequest(lemma="тест")]
+        )
+        assert query.max_examples is None
+
+    def test_max_examples_accepts_positive_int(self):
+        """Test that max_examples accepts positive integers."""
+        query = SearchQuery(
+            tokens=[TokenRequest(lemma="тест")],
+            max_examples=100
+        )
+        assert query.max_examples == 100
+
+    def test_max_examples_rejects_zero(self):
+        """Test that max_examples=0 raises ValidationError."""
+        with pytest.raises(ValidationError):
+            SearchQuery(
+                tokens=[TokenRequest(lemma="тест")],
+                max_examples=0
+            )
+
+    def test_max_examples_rejects_negative(self):
+        """Test that negative max_examples raises error."""
+        with pytest.raises(ValidationError):
+            SearchQuery(
+                tokens=[TokenRequest(lemma="тест")],
+                max_examples=-5
+            )
+
 
 @pytest.mark.unit
 class TestResponseSchemas:
@@ -380,6 +411,19 @@ class TestResponseSchemas:
         assert stats.subcorpStats.textCount == 50000
         assert stats.queryStats.textCount == 150
         assert stats.total_pages_available == 10
+
+    def test_global_stats_last_page_fetched_default(self):
+        """Test that last_page_fetched defaults to 0."""
+        stats = GlobalStats(total_pages_available=10)
+        assert stats.last_page_fetched == 0
+
+    def test_global_stats_last_page_fetched_explicit(self):
+        """Test setting last_page_fetched explicitly."""
+        stats = GlobalStats(
+            total_pages_available=10,
+            last_page_fetched=5
+        )
+        assert stats.last_page_fetched == 5
 
     def test_global_stats_total_pages_required(self):
         """Test that total_pages_available is required."""

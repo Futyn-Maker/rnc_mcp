@@ -32,12 +32,16 @@ pytest --cov=src/rnc_mcp --cov-report=term-missing
 
 Requires `RNC_API_TOKEN` environment variable. Get token from: https://ruscorpora.ru/accounts/profile/for-devs
 
+Optional variables for multi-page fetching:
+- `RNC_PAGE_DELAY` — delay in seconds between page requests (default: `0.5`)
+- `RNC_MAX_RETRIES` — consecutive failures before aborting multi-page fetch (default: `3`)
+
 ## Architecture
 
 ```
 src/rnc_mcp/
-├── mcp.py              # FastMCP server entry point, registers tool & resources
-├── config.py           # Config singleton (token, base URL, corpus types)
+├── mcp.py              # FastMCP server entry point, registers tool & resources, multi-page collection
+├── config.py           # Config singleton (token, base URL, corpus types, page delay, max retries)
 ├── schemas/schemas.py  # Pydantic models for request/response (SearchQuery, ConcordanceResponse)
 ├── clients/
 │   ├── base.py         # CorpusClient abstract base class
@@ -54,10 +58,28 @@ src/rnc_mcp/
 
 ## Data Flow
 
+### Single-page (default)
+
 1. **Tool call**: `concordance(SearchQuery)` receives Pydantic-validated query
 2. **Build**: `RNCQueryBuilder.build_payload()` converts to RNC API JSON format
 3. **Execute**: `RNCClient.execute_concordance()` makes HTTP POST to RNC API
 4. **Format**: `RNCResponseFormatter.format_search_results()` parses response into `ConcordanceResponse`
+
+### Multi-page (when `max_examples` is set)
+
+1. **Tool call**: `concordance(SearchQuery)` detects `max_examples` is set and delegates to `_collect_examples()`
+2. **Build**: `RNCQueryBuilder.build_payload()` builds the base payload; `docsPerPage` is overridden to 50, `snippetsPerDoc` to 10
+3. **Loop**: For each page starting from `query.page`:
+   - **Execute**: `RNCClient.execute_concordance()` fetches one page
+   - **Format**: `RNCResponseFormatter.format_search_results()` parses the page
+   - **Accumulate**: Documents are appended to results; total examples (snippets) are counted
+   - **Trim**: If the last document pushes total over `max_examples`, its examples list is truncated
+   - **Stop conditions**: `max_examples` reached, all pages exhausted, or `RNC_MAX_RETRIES` consecutive failures
+   - **Retry**: On error, the same page is retried up to `RNC_MAX_RETRIES` times; counter resets on success
+   - **Delay**: `RNC_PAGE_DELAY` seconds between requests
+4. **Return**: Single `ConcordanceResponse` with merged results and stats from the first page; `last_page_fetched` indicates the last successfully fetched page
+
+The RNC API hard-caps `docsPerPage` at 50; requesting more still returns 50.
 
 ## Logging Strategy
 
@@ -69,10 +91,10 @@ The `@measure_time` decorator in `utils.py` automatically logs execution time vi
 
 ## Key Types
 
-- `SearchQuery`: Main input schema with corpus, tokens, subcorpus filters, pagination
+- `SearchQuery`: Main input schema with corpus, tokens, subcorpus filters, pagination, `max_examples` for multi-page collection
 - `TokenRequest`: Search token with lemma, wordform, gramm, semantic, syntax, flags, distance
 - `SubcorpusFilter`: Filter by author, title, date range, gender, disambiguation mode
-- `ConcordanceResponse`: Output with stats (corpus/query/subcorpus counts) and document results
+- `ConcordanceResponse`: Output with stats (corpus/query/subcorpus counts, `last_page_fetched`) and document results
 
 ## Testing
 
@@ -86,6 +108,7 @@ Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`
 - **test_config.py**: Config validation, token retrieval, headers, RncCorpusType enum
 - **test_schemas.py**: Pydantic schema validation for TokenRequest, SubcorpusFilter, SearchQuery, response models
 - **test_schemas_repr.py**: Custom `__str__` representations for schemas
+- **test_collect_examples.py**: Multi-page collection logic (pagination, trimming, retry, exhaustion, payload overrides)
 - **services/test_rnc_builder.py**: Token conditions, distance conditions, date ranges, subcorpus filters, full payload building
 - **services/test_rnc_formatter.py**: Metadata extraction, snippet formatting, stats parsing, response structure
 - **resources/test_rnc_generator.py**: Markdown generation, sorting methods, attributes, error handling
@@ -108,9 +131,9 @@ E2E_SERVER_URL=http://127.0.0.1:8000/mcp
 ```
 
 E2E test files:
-- **tests/e2e/test_concordance.py**: Concordance tool tests for all 16 corpora
+- **tests/e2e/test_concordance.py**: Concordance tool tests for all 16 corpora + multi-page collection (500 examples)
 - **tests/e2e/test_resources.py**: Resource generation tests for all corpora
-- **tests/fixtures/e2e_queries.py**: Raw JSON query fixtures
+- **tests/fixtures/e2e_queries.py**: Raw JSON query fixtures (including `MULTI_PAGE_500_EXAMPLES`)
 
 ### Corpus Status (E2E Test Results)
 
@@ -202,6 +225,30 @@ async def simple_search():
         print(result.structured_content)
 
 asyncio.run(simple_search())
+```
+
+**Collect many examples across pages:**
+
+```python
+async def multi_page_search():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+        result = await client.call_tool(
+            "concordance",
+            {
+                "query": {
+                    "corpus": "MAIN",
+                    "tokens": [{"lemma": "дом"}],
+                    "max_examples": 200
+                }
+            }
+        )
+        data = result.structured_content
+        total = sum(len(d["examples"]) for d in data["results"])
+        print(f"Collected {total} examples")
+        print(f"Last page fetched: {data['stats']['last_page_fetched']}")
+        print(f"Total pages available: {data['stats']['total_pages_available']}")
+
+asyncio.run(multi_page_search())
 ```
 
 **Result object attributes:**

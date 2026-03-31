@@ -141,6 +141,16 @@ class SearchQuery(BaseModel):
     per_page: int = Field(
         10, description="Documents per page."
     )
+    max_examples: Optional[int] = Field(
+        None,
+        ge=1,
+        description=(
+            "Maximum number of text examples to collect. "
+            "When set, multiple pages are fetched automatically starting "
+            "from 'page' until this many examples are gathered or results "
+            "are exhausted. Overrides per_page to 50 for efficiency."
+        )
+    )
     return_examples: bool = Field(
         True,
         description=(
@@ -159,7 +169,15 @@ class SearchQuery(BaseModel):
         if self.subcorpus:
             lines.append(f"  Subcorpus: {self.subcorpus}")
 
-        lines.append(f"  Page: {self.page} (size={self.per_page})")
+        if self.max_examples is not None:
+            lines.append(
+                f"  Multi-page: max {self.max_examples} examples,"
+                f" starting from page {self.page}"
+            )
+        else:
+            lines.append(
+                f"  Page: {self.page} (size={self.per_page})"
+            )
         if self.sort:
             lines.append(f"  Sort: {self.sort}")
         if not self.return_examples:
@@ -189,8 +207,10 @@ class DocMetadata(BaseModel):
 
 class DocumentItem(BaseModel):
     metadata: DocMetadata
-    examples: List[str] = Field(...,
-                                description="List of text fragments found in the document.")
+    examples: List[str] = Field(
+        ...,
+        description="List of text fragments found in the document."
+    )
 
     def __str__(self):
         return f"{self.metadata}: {len(self.examples)} matches"
@@ -209,6 +229,7 @@ class GlobalStats(BaseModel):
     subcorpStats: Optional[StatValues] = None
     queryStats: Optional[StatValues] = None
     total_pages_available: int
+    last_page_fetched: int = 0
 
     def __str__(self):
         lines = []
@@ -218,7 +239,10 @@ class GlobalStats(BaseModel):
             lines.append(f"Subcorpus: {self.subcorpStats}")
         if self.queryStats:
             lines.append(f"Found: {self.queryStats}")
-        lines.append(f"Total Pages: {self.total_pages_available}")
+        lines.append(
+            f"Pages: {self.last_page_fetched}"
+            f"/{self.total_pages_available}"
+        )
         return ", ".join(lines)
 
 

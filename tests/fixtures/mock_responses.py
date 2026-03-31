@@ -307,6 +307,84 @@ CONCORDANCE_MULTIPLE_DOCS = {
 }
 
 # ==============================================================================
+# Multi-Page Responses (for _collect_examples tests)
+# ==============================================================================
+
+
+def _make_doc(title, author, year, num_snippets=1):
+    """Helper to build a mock document with N snippets."""
+    snippets = []
+    for i in range(num_snippets):
+        snippets.append({
+            "sequences": [{
+                "words": [
+                    {"text": f"word{i}", "displayParams": {}},
+                    {"text": " ", "displayParams": {}},
+                    {
+                        "text": f"hit{i}",
+                        "displayParams": {"hit": True},
+                    },
+                ]
+            }]
+        })
+    return {
+        "info": {
+            "title": title,
+            "docExplainInfo": {
+                "items": [{
+                    "parsingFields": [
+                        {
+                            "name": "author",
+                            "value": [
+                                {"valString": {"v": author}}
+                            ],
+                        },
+                        {
+                            "name": "created",
+                            "value": [
+                                {"valString": {"v": year}}
+                            ],
+                        },
+                    ]
+                }]
+            },
+        },
+        "snippetGroups": [{"snippets": snippets}],
+    }
+
+
+def make_multipage_response(
+    page, total_pages=5, docs_per_page=2,
+    snippets_per_doc=2
+):
+    """Build a mock RNC API response for a given page."""
+    docs = []
+    for d in range(docs_per_page):
+        idx = page * docs_per_page + d
+        docs.append(_make_doc(
+            title=f"Doc {idx}",
+            author=f"Author {idx}",
+            year=str(2000 + idx),
+            num_snippets=snippets_per_doc,
+        ))
+    return {
+        "corpusStats": {
+            "textCount": 1000,
+            "wordUsageCount": 50000,
+        },
+        "queryStats": {
+            "textCount": total_pages * docs_per_page,
+            "wordUsageCount": (
+                total_pages * docs_per_page
+                * snippets_per_doc
+            ),
+        },
+        "pagination": {"totalPageCount": total_pages},
+        "groups": [{"docs": docs}],
+    }
+
+
+# ==============================================================================
 # Corpus Configuration Responses
 # ==============================================================================
 

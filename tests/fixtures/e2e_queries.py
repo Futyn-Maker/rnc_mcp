@@ -596,6 +596,18 @@ POETRY_SPECIAL = [
     ("kofiy", POETIC_KOFIY),
 ]
 
+# ==============================================================================
+# Multi-Page Collection Query
+# ==============================================================================
+
+MULTI_PAGE_500_EXAMPLES = {
+    "query": {
+        "corpus": "MAIN",
+        "tokens": [{"lemma": "дом"}],
+        "max_examples": 500,
+    }
+}
+
 ADVANCED_QUERIES = [
     ("multitoken", MULTITOKEN_SEMANTIC_QUERY),
     ("syntax", QUERY_WITH_SYNTAX),

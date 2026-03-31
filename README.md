@@ -8,6 +8,7 @@ The server abstracts the complexity of the raw RNC API, providing a streamlined 
 
 * **Zero-Code Integration:** Connects seamlessly to any MCP-compliant client (Claude Web or Desktop, IDEs, etc.).
 * **Concordance Search:** Powerful querying capabilities including lemmas, exact word forms, grammar tags, semantic tags, and syntactic roles.
+* **Multi-Page Collection:** Automatically fetch hundreds of examples across multiple pages with a single tool call by setting `max_examples`, with built-in retry logic and rate-limit protection.
 * **Subcorpus Filtering:** Filter results by author, title, date range, gender, and disambiguation mode.
 * **Dynamic Resources:** Automatically generates context regarding available corpus configurations and tagsets.
 
@@ -23,8 +24,17 @@ You must have a valid API token from the Russian National Corpus.
 
 Create a `.env` file in the project root (you can copy `.env.example` as a template).
 
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `RNC_API_TOKEN` | Yes | — | API token from [RNC profile](https://ruscorpora.ru/accounts/profile/for-devs) |
+| `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
+| `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
+
 ```bash
 RNC_API_TOKEN=your_token_here
+# Optional: tune multi-page fetching behavior
+# RNC_PAGE_DELAY=0.5
+# RNC_MAX_RETRIES=3
 ```
 
 ### 3. Running the Server
@@ -71,7 +81,7 @@ The server exposes a single, powerful tool for interacting with the corpus.
 
 ### `concordance`
 
-Performs a lexicographic search in the corpus. It builds a complex query payload, handles pagination, and formats the results.
+Performs a lexicographic search in the corpus. It builds a complex query payload, handles pagination, and formats the results. Supports automatic multi-page collection via the `max_examples` parameter.
 
 **Input Schema:**
 
@@ -92,12 +102,13 @@ The tool expects a `query` wrapper object containing the search parameters:
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `corpus` | string | `"MAIN"` | Corpus to search. Options: `MAIN`, `PAPER`, `POETIC`, `SPOKEN`, `DIALECT`, `SCHOOL`, `SYNTAX`, `MULTI`, `ACCENT`, `MULTIPARC`, `KIDS`, `CLASSICS`, `BLOGS` |
+| `corpus` | string | `"MAIN"` | Corpus to search. Options: `MAIN`, `PAPER`, `POETIC`, `SPOKEN`, `DIALECT`, `SCHOOL`, `SYNTAX`, `MULTI`, `ACCENT`, `MULTIPARC`, `KIDS`, `CLASSICS`, `BLOGS`, `PANCHRON`, `OLD_RUS`, `MID_RUS` |
 | `tokens` | array | *required* | Sequence of token conditions to search for (see below) |
 | `subcorpus` | object | `null` | Subcorpus filtering options (see below) |
 | `sort` | string | `null` | Sort order (e.g., `"grcreated"` for creation date) |
-| `page` | integer | `0` | Page number (0-indexed) |
-| `per_page` | integer | `10` | Documents per page |
+| `page` | integer | `0` | Page number (0-indexed). In multi-page mode, the starting page |
+| `per_page` | integer | `10` | Documents per page (ignored when `max_examples` is set) |
+| `max_examples` | integer | `null` | When set, automatically fetches multiple pages starting from `page` until this many text examples are collected or results are exhausted. Overrides `per_page` to 50 for efficiency |
 | `return_examples` | boolean | `true` | If `false`, returns only statistics without text snippets |
 
 **Token parameters** (each token in the `tokens` array):
@@ -160,7 +171,8 @@ Returns a `ConcordanceResponse` object with statistics and document matches:
       "textCount": 38728,
       "wordUsageCount": 399705
     },
-    "total_pages_available": 3873
+    "total_pages_available": 3873,
+    "last_page_fetched": 0
   },
   "results": [
     {
@@ -188,6 +200,7 @@ Returns a `ConcordanceResponse` object with statistics and document matches:
 | `queryStats.textCount` | Number of documents matching the query |
 | `queryStats.wordUsageCount` | Number of word occurrences matching the query |
 | `total_pages_available` | Total number of pages available for pagination |
+| `last_page_fetched` | The last page number that was successfully fetched (useful for resuming multi-page queries) |
 
 **Results fields:**
 
@@ -367,6 +380,48 @@ async def complex_search():
 
 if __name__ == "__main__":
     asyncio.run(complex_search())
+```
+
+### Multi-Page Collection
+
+When you need many examples for corpus research, set `max_examples` to automatically fetch across multiple pages. The server handles pagination, retries, and trimming internally.
+
+```python
+import asyncio
+from fastmcp import Client
+
+async def collect_examples():
+    async with Client("http://127.0.0.1:8000/mcp") as client:
+
+        # Collect 500 usage examples of the word "дом"
+        # The server will fetch multiple pages automatically
+        result = await client.call_tool(
+            "concordance",
+            {
+                "query": {
+                    "corpus": "MAIN",
+                    "tokens": [{"lemma": "дом"}],
+                    "max_examples": 500
+                }
+            }
+        )
+
+        data = result.structured_content
+        stats = data["stats"]
+
+        total_examples = sum(
+            len(doc["examples"]) for doc in data["results"]
+        )
+        print(f"Collected {total_examples} examples "
+              f"from {len(data['results'])} documents")
+        print(f"Pages fetched: 0–{stats['last_page_fetched']} "
+              f"of {stats['total_pages_available']} available")
+
+        # You can resume from where it stopped:
+        # next_page = stats["last_page_fetched"] + 1
+
+if __name__ == "__main__":
+    asyncio.run(collect_examples())
 ```
 
 ## Development
