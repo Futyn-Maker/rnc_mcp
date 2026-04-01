@@ -22,7 +22,7 @@ class Config:
         os.getenv("RNC_AUTH_CACHE_TTL", "300")
     )
     RNC_OAUTH_DB_PATH: str = os.getenv(
-        "RNC_OAUTH_DB_PATH", "data/oauth.db"
+        "RNC_OAUTH_DB_PATH", "/tmp/oauth.db"
     )
     RNC_OAUTH_BASE_URL: str = os.getenv(
         "RNC_OAUTH_BASE_URL",

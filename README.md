@@ -35,7 +35,7 @@ No `RNC_API_TOKEN` is required on the server side. Users authenticate via OAuth2
 | `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
 | `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
 | `RNC_AUTH_CACHE_TTL` | No | `300` | How long validated tokens are cached, in seconds |
-| `RNC_OAUTH_DB_PATH` | No | `data/oauth.db` | Path to the SQLite database for OAuth data |
+| `RNC_OAUTH_DB_PATH` | No | `/tmp/oauth.db` | Path to the SQLite database for OAuth data |
 | `RNC_OAUTH_BASE_URL` | No | `http://127.0.0.1:8000` | Public base URL for OAuth metadata endpoints |
 
 #### STDIO transport (local usage)

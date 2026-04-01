@@ -44,7 +44,7 @@ Optional variables:
 - `RNC_PAGE_DELAY` — delay in seconds between page requests (default: `0.5`)
 - `RNC_MAX_RETRIES` — consecutive failures before aborting multi-page fetch (default: `3`)
 - `RNC_AUTH_CACHE_TTL` — how long validated tokens are cached, in seconds (default: `300`)
-- `RNC_OAUTH_DB_PATH` — path to the SQLite database for OAuth data (default: `data/oauth.db`)
+- `RNC_OAUTH_DB_PATH` — path to the SQLite database for OAuth data (default: `/tmp/oauth.db`)
 - `RNC_OAUTH_BASE_URL` — public base URL of the server, used for OAuth metadata (default: `http://127.0.0.1:8000`)
 
 ### STDIO transport (local usage)
