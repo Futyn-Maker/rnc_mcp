@@ -329,10 +329,8 @@ class RNCOAuthProvider(OAuthProvider):
 
     # --- Login page routes ---
 
-    def get_routes(
-        self, mcp_path: str | None = None
-    ) -> list[Route]:
-        routes = super().get_routes(mcp_path)
+    def get_routes(self, **kwargs) -> list[Route]:
+        routes = super().get_routes(**kwargs)
         routes.append(
             Route(
                 "/login",
