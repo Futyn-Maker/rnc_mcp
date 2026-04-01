@@ -6,7 +6,7 @@ The server abstracts the complexity of the raw RNC API, providing a streamlined 
 
 ## Features
 
-* **Per-User Authentication:** Each connecting client provides their own RNC API token via bearer auth. Tokens are validated against the RNC API and cached with a configurable TTL.
+* **Per-User Authentication:** Supports two auth paths — **OAuth2** (for web clients like Claude.ai that only support OAuth) and **direct bearer tokens** (for scripts, IDEs, programmatic access). In the OAuth2 flow, the user enters their RNC API token in a login form; the server issues OAuth tokens mapped to it. All auth data is encrypted and persisted in SQLite.
 * **Zero-Code Integration:** Connects seamlessly to any MCP-compliant client (Claude Web or Desktop, IDEs, etc.).
 * **Concordance Search:** Powerful querying capabilities including lemmas, exact word forms, grammar tags, semantic tags, and syntactic roles.
 * **Multi-Page Collection:** Automatically fetch hundreds of examples across multiple pages with a single tool call by setting `max_examples`, with built-in retry logic and rate-limit protection.
@@ -27,14 +27,16 @@ Create a `.env` file in the project root (you can copy `.env.example` as a templ
 
 #### HTTP transport (multi-user, recommended)
 
-No `RNC_API_TOKEN` is required on the server side. Each connecting client provides their own RNC API token via bearer auth (`Authorization: Bearer <token>`). The server validates it against the RNC API on first use and caches the result.
+No `RNC_API_TOKEN` is required on the server side. Users authenticate via OAuth2 (entering their RNC token in a browser form) or by sending a raw RNC API token as a direct bearer token.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `RNC_API_TOKEN` | No | — | Not used in HTTP mode. Users provide their own tokens via bearer auth |
+| `RNC_API_TOKEN` | No | — | Not used in HTTP mode. Users provide their own tokens |
 | `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
 | `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
 | `RNC_AUTH_CACHE_TTL` | No | `300` | How long validated tokens are cached, in seconds |
+| `RNC_OAUTH_DB_PATH` | No | `data/oauth.db` | Path to the SQLite database for OAuth data |
+| `RNC_OAUTH_BASE_URL` | No | `http://127.0.0.1:8000` | Public base URL for OAuth metadata endpoints |
 
 #### STDIO transport (local usage)
 

@@ -17,13 +17,22 @@ from rnc_mcp.resources.rnc_generator import (
     RNCResourceGenerator,
 )
 from rnc_mcp.auth.rnc_validator import RNCTokenValidator
-from rnc_mcp.auth.rnc_provider import RNCAuthProvider
+from rnc_mcp.auth.token_store import TokenStore
+from rnc_mcp.auth.oauth_provider import RNCOAuthProvider
 
 
 validator = RNCTokenValidator(
     cache_ttl=Config.RNC_AUTH_CACHE_TTL
 )
-auth = RNCAuthProvider(validator)
+token_store = TokenStore(db_path=Config.RNC_OAUTH_DB_PATH)
+auth = RNCOAuthProvider(
+    store=token_store,
+    rnc_validator=validator,
+    base_url=Config.RNC_OAUTH_BASE_URL,
+    service_documentation_url=(
+        "https://ruscorpora.ru/accounts/profile/for-devs"
+    ),
+)
 
 mcp = FastMCP("Russian National Corpus", auth=auth)
 client = RNCClient()
@@ -33,13 +42,17 @@ resource_generator = RNCResourceGenerator(client)
 def _get_user_token() -> str:
     """Get user's RNC token from auth context or env var.
 
-    HTTP transport: returns the bearer token provided by
-    the user (validated by the auth layer).
+    HTTP transport (OAuth): resolves OAuth access token
+    to the underlying RNC API token via the store.
+    HTTP transport (direct bearer): the bearer token
+    itself is the RNC API token.
     STDIO transport: returns RNC_API_TOKEN from env var.
     """
     access_token = get_access_token()
     if access_token is not None:
-        return access_token.token
+        return auth.resolve_rnc_token(
+            access_token.token
+        )
     return Config.get_rnc_token()
 
 

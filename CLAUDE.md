@@ -6,7 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A Model Context Protocol (MCP) server that connects LLMs to the Russian National Corpus (RNC) API. Built with FastMCP, it exposes a `concordance` tool for lexicographic searches and dynamic resources for corpus configuration.
 
-The server supports per-user authentication: each connecting client provides their own RNC API token via bearer auth. Tokens are validated against the RNC API's `/auth/check-authenticated/` endpoint and cached with a configurable TTL.
+The server supports per-user authentication via two paths:
+1. **OAuth2 flow** (for web clients like Claude.ai): the user enters their RNC API token in a login form, the server issues OAuth access/refresh tokens mapped to that RNC token.
+2. **Direct bearer** (for scripts, IDEs, programmatic access): the client sends a raw RNC API token as a bearer token.
+
+Both paths validate tokens against the RNC API's `/auth/check-authenticated/` endpoint with TTL caching. OAuth data (clients, tokens) is persisted in an encrypted SQLite database that survives server restarts.
 
 ## Commands
 
@@ -40,6 +44,8 @@ Optional variables:
 - `RNC_PAGE_DELAY` — delay in seconds between page requests (default: `0.5`)
 - `RNC_MAX_RETRIES` — consecutive failures before aborting multi-page fetch (default: `3`)
 - `RNC_AUTH_CACHE_TTL` — how long validated tokens are cached, in seconds (default: `300`)
+- `RNC_OAUTH_DB_PATH` — path to the SQLite database for OAuth data (default: `data/oauth.db`)
+- `RNC_OAUTH_BASE_URL` — public base URL of the server, used for OAuth metadata (default: `http://127.0.0.1:8000`)
 
 ### STDIO transport (local usage)
 
@@ -55,9 +61,12 @@ src/rnc_mcp/
 ├── config.py           # Config singleton (base URL, corpus types, page delay, max retries, auth cache TTL)
 ├── schemas/schemas.py  # Pydantic models for request/response (SearchQuery, ConcordanceResponse)
 ├── auth/
-│   ├── base.py         # TokenValidator abstract base class
+│   ├── base.py          # TokenValidator abstract base class
 │   ├── rnc_validator.py # RNCTokenValidator: validates tokens via RNC API with TTL cache
-│   └── rnc_provider.py # RNCAuthProvider: FastMCP TokenVerifier subclass, bridges to TokenValidator
+│   ├── rnc_provider.py  # RNCAuthProvider: FastMCP TokenVerifier subclass (direct bearer only)
+│   ├── oauth_provider.py # RNCOAuthProvider: full OAuth2 + direct bearer dual auth
+│   ├── token_store.py   # Encrypted SQLite store for OAuth tokens, clients, RNC token mappings
+│   └── login_page.py    # HTML login form for the OAuth authorization flow
 ├── clients/
 │   ├── base.py         # CorpusClient abstract base class
 │   └── rnc_client.py   # HTTP client implementation using httpx
@@ -73,27 +82,64 @@ src/rnc_mcp/
 
 ## Authentication Flow
 
-### HTTP transport
+The server uses `RNCOAuthProvider` which supports two authentication paths simultaneously.
+
+### Path 1: OAuth2 flow (web clients like Claude.ai)
 
 ```
-Client connects with Authorization: Bearer <RNC_API_TOKEN>
+Client connects → gets 401
         │
         ▼
-RNCAuthProvider.verify_token(token)
-  → RNCTokenValidator.validate(token)
+Client discovers /.well-known/oauth-authorization-server
+        │
+        ▼
+Dynamic Client Registration: POST /register → gets client_id
+        │
+        ▼
+Browser redirects to /authorize?client_id=...&code_challenge=...
+        │
+        ▼
+Server redirects to /login?txn=TRANSACTION_ID
+        │
+        ▼
+User sees HTML form, pastes their RNC API token
+        │
+        ▼
+POST /login → RNCTokenValidator validates token against RNC API
+  → invalid: show error, user retries
+  → valid: generate auth code, encrypt RNC token, store in SQLite
+        │
+        ▼
+Redirect to redirect_uri?code=CODE&state=STATE
+        │
+        ▼
+Client exchanges code: POST /token → gets access_token + refresh_token
+(RNC token is encrypted in SQLite, mapped to the access token)
+        │
+        ▼
+Client uses access_token → RNCOAuthProvider.load_access_token()
+  → finds token in SQLite store
+  → _get_user_token() calls auth.resolve_rnc_token()
+  → decrypts and returns the user's original RNC API token
+```
+
+### Path 2: Direct bearer (scripts, IDEs, programmatic access)
+
+```
+Client connects with Authorization: Bearer <RAW_RNC_TOKEN>
+        │
+        ▼
+RNCOAuthProvider.load_access_token(token)
+  → not found in OAuth store
+  → falls back to RNCTokenValidator.validate(token)
     → checks in-memory TTL cache
     → on cache miss: GET /api/v1/auth/check-authenticated/ with token
-    → caches result for RNC_AUTH_CACHE_TTL seconds
-  → returns AccessToken (with raw token) or None
+  → valid: returns AccessToken (client_id="rnc-direct")
+  → invalid: returns None → 401
         │
         ▼
-Tool/Resource handler calls _get_user_token()
-  → get_access_token() returns AccessToken from auth context
-  → extracts .token (the raw bearer token)
-  → passes it to RNCClient methods
-        │
-        ▼
-RNCClient uses the user's token in Authorization header
+_get_user_token() → auth.resolve_rnc_token(token)
+  → not in OAuth store → returns the token itself (it IS the RNC token)
 ```
 
 ### STDIO transport
@@ -104,11 +150,25 @@ _get_user_token()
   → falls back to Config.get_rnc_token() (from RNC_API_TOKEN env var)
 ```
 
+### OAuth endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/.well-known/oauth-authorization-server` | GET | OAuth metadata discovery (RFC 8414) |
+| `/.well-known/oauth-protected-resource/mcp` | GET | Protected resource metadata (RFC 9728) |
+| `/register` | POST | Dynamic client registration (RFC 7591) |
+| `/authorize` | GET | Starts OAuth flow, redirects to /login |
+| `/login` | GET/POST | RNC token login form |
+| `/token` | POST | Code-for-token exchange, refresh |
+| `/revoke` | POST | Token revocation |
+
 ### Key design decisions
 
-- **No token storage**: tokens are never persisted. The in-memory cache only stores validation results (`{token: (is_valid, timestamp)}`).
-- **User token isolation**: in HTTP mode, `RNC_API_TOKEN` env var is never used — even if set, `_get_user_token()` prioritizes the auth context.
-- **Abstract base classes**: `TokenValidator` (domain interface) is decoupled from `RNCAuthProvider` (FastMCP integration), following the same pattern as `CorpusClient`/`RNCClient` and `CorpusResourceGenerator`/`RNCResourceGenerator`.
+- **Dual auth**: OAuth2 tokens and raw RNC bearer tokens are both accepted. `load_access_token()` checks the SQLite store first, then falls back to `RNCTokenValidator`.
+- **Encrypted storage**: RNC API tokens are encrypted with Fernet (AES-128-CBC) before storage in SQLite. The encryption key is auto-generated on first run and stored at `data/.fernet.key` (permissions 0600).
+- **SQLite persistence**: OAuth clients, access/refresh tokens, and their RNC token mappings survive server restarts. No external database required.
+- **User token isolation**: each user's RNC token is stored separately, encrypted, and only decryptable by this server instance.
+- **Abstract base classes**: `TokenValidator` (domain interface) is decoupled from the auth providers, following the same pattern as `CorpusClient`/`RNCClient`.
 
 ## Data Flow
 
@@ -163,6 +223,8 @@ Tests use pytest-asyncio with mock fixtures. Key fixtures in `tests/conftest.py`
 ### Unit Tests
 
 - **test_auth.py**: Token validation (valid/invalid/empty/network error), TTL cache (hit/miss/expiry/storage), RNCAuthProvider (AccessToken creation, empty/whitespace rejection)
+- **test_token_store.py**: Encryption roundtrip, key persistence, client/code/token CRUD, revocation, pending auth, SQLite persistence across instances
+- **test_oauth_provider.py**: Client registration, authorize flow, code exchange, refresh token rotation, dual auth (OAuth + direct bearer), RNC token resolution, revocation
 - **test_config.py**: Config validation, token retrieval, headers, RncCorpusType enum
 - **test_schemas.py**: Pydantic schema validation for TokenRequest, SubcorpusFilter, SearchQuery, response models
 - **test_schemas_repr.py**: Custom `__str__` representations for schemas

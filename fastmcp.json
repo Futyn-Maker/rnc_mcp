@@ -16,7 +16,12 @@
     "port": 8000,
     "log_level": "INFO",
     "env": {
-      "RNC_API_TOKEN": "${RNC_API_TOKEN}"
+      "RNC_API_TOKEN": "${RNC_API_TOKEN}",
+      "RNC_PAGE_DELAY": "${RNC_PAGE_DELAY}",
+      "RNC_MAX_RETRIES": "${RNC_MAX_RETRIES}",
+      "RNC_AUTH_CACHE_TTL": "${RNC_AUTH_CACHE_TTL}",
+      "RNC_OAUTH_BASE_URL": "${RNC_OAUTH_BASE_URL}",
+      "RNC_OAUTH_DB_PATH": "${RNC_OAUTH_DB_PATH}"
     }
   }
 }

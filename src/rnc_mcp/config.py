@@ -21,6 +21,13 @@ class Config:
     RNC_AUTH_CACHE_TTL: float = float(
         os.getenv("RNC_AUTH_CACHE_TTL", "300")
     )
+    RNC_OAUTH_DB_PATH: str = os.getenv(
+        "RNC_OAUTH_DB_PATH", "data/oauth.db"
+    )
+    RNC_OAUTH_BASE_URL: str = os.getenv(
+        "RNC_OAUTH_BASE_URL",
+        "http://127.0.0.1:8000",
+    )
 
     RNC_CORPORA: Dict[str, str] = {
         "MAIN": "Main",
