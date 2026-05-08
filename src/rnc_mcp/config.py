@@ -21,13 +21,27 @@ class Config:
     RNC_AUTH_CACHE_TTL: float = float(
         os.getenv("RNC_AUTH_CACHE_TTL", "300")
     )
-    RNC_OAUTH_DB_PATH: str = os.getenv(
-        "RNC_OAUTH_DB_PATH", "/tmp/oauth.db"
-    )
     RNC_OAUTH_BASE_URL: str = os.getenv(
         "RNC_OAUTH_BASE_URL",
         "http://127.0.0.1:8000",
     )
+
+    @classmethod
+    def get_database_url(cls) -> str:
+        """Resolve the OAuth database connection URL.
+
+        Precedence: ``RNC_DATABASE_URL`` (any SQLAlchemy URL,
+        e.g. ``postgresql://...``) → legacy
+        ``RNC_OAUTH_DB_PATH`` (interpreted as a SQLite file)
+        → SQLite at ``/tmp/oauth.db``.
+        """
+        url = os.getenv("RNC_DATABASE_URL")
+        if url:
+            return url
+        legacy_path = os.getenv("RNC_OAUTH_DB_PATH")
+        if legacy_path:
+            return f"sqlite:///{legacy_path}"
+        return "sqlite:////tmp/oauth.db"
 
     RNC_CORPORA: Dict[str, str] = {
         "MAIN": "Main",

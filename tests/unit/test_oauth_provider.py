@@ -27,9 +27,10 @@ def fernet_key():
 
 @pytest.fixture
 def store(tmp_path, fernet_key):
-    db_path = str(tmp_path / "test_oauth.db")
+    db_path = tmp_path / "test_oauth.db"
     return TokenStore(
-        db_path=db_path, fernet_key=fernet_key
+        database_url=f"sqlite:///{db_path}",
+        fernet_key=fernet_key,
     )
 
 

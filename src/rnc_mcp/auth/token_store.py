@@ -1,20 +1,48 @@
-"""Encrypted token store backed by SQLite.
+"""Encrypted token store backed by an SQL database.
 
 Stores OAuth tokens (access, refresh, authorization codes,
 client registrations) and their mappings to RNC API tokens.
 RNC tokens are encrypted at rest using Fernet symmetric
-encryption. The SQLite database survives server restarts.
+encryption.
+
+The backend is configured by a SQLAlchemy connection URL,
+so any supported dialect works (SQLite, PostgreSQL, MySQL,
+...). The schema and all queries are dialect-agnostic; the
+only place a dialect is consulted is upsert, where the SQLite
+and PostgreSQL ``ON CONFLICT`` extensions are used when
+available and a delete-then-insert fallback handles other
+backends.
 """
 
 import json
 import os
 import secrets
-import sqlite3
 import time
 from dataclasses import dataclass
 from typing import Optional
 
 from cryptography.fernet import Fernet
+from sqlalchemy import (
+    Column,
+    Float,
+    Integer,
+    LargeBinary,
+    MetaData,
+    String,
+    Table,
+    Text,
+    create_engine,
+    delete,
+    insert,
+    select,
+)
+from sqlalchemy.dialects.postgresql import (
+    insert as pg_insert,
+)
+from sqlalchemy.dialects.sqlite import (
+    insert as sqlite_insert,
+)
+from sqlalchemy.engine import Engine, make_url
 
 
 @dataclass
@@ -60,47 +88,157 @@ ACCESS_TOKEN_EXPIRY = 60 * 60  # 1 hour
 PENDING_AUTH_EXPIRY = 10 * 60  # 10 minutes
 
 
-class TokenStore:
-    """Encrypted SQLite-backed token store.
+_metadata = MetaData()
 
-    All RNC API tokens are encrypted with Fernet before
-    storage. The encryption key is auto-generated on first
-    run and stored in the database directory.
+_clients = Table(
+    "rnc_oauth_clients",
+    _metadata,
+    Column("client_id", String(255), primary_key=True),
+    Column("data", Text, nullable=False),
+)
+
+_auth_codes = Table(
+    "rnc_oauth_auth_codes",
+    _metadata,
+    Column("code", String(255), primary_key=True),
+    Column("client_id", String(255), nullable=False),
+    Column("scopes", Text, nullable=False),
+    Column("expires_at", Float, nullable=False),
+    Column("code_challenge", Text, nullable=False),
+    Column("redirect_uri", Text, nullable=False),
+    Column(
+        "redirect_uri_explicit", Integer, nullable=False
+    ),
+    Column("rnc_token", LargeBinary, nullable=False),
+)
+
+_access_tokens = Table(
+    "rnc_oauth_access_tokens",
+    _metadata,
+    Column("token", String(255), primary_key=True),
+    Column("client_id", String(255), nullable=False),
+    Column("scopes", Text, nullable=False),
+    Column("expires_at", Float, nullable=True),
+    Column("rnc_token", LargeBinary, nullable=False),
+)
+
+_refresh_tokens = Table(
+    "rnc_oauth_refresh_tokens",
+    _metadata,
+    Column("token", String(255), primary_key=True),
+    Column("client_id", String(255), nullable=False),
+    Column("scopes", Text, nullable=False),
+    Column("expires_at", Float, nullable=True),
+    Column("rnc_token", LargeBinary, nullable=False),
+)
+
+_token_pairs = Table(
+    "rnc_oauth_token_pairs",
+    _metadata,
+    Column("access_token", String(255), primary_key=True),
+    Column("refresh_token", String(255), primary_key=True),
+)
+
+
+def _build_engine(database_url: str) -> Engine:
+    """Create an SQLAlchemy engine from a connection URL.
+
+    For SQLite file URLs, the parent directory is created on
+    demand and ``check_same_thread`` is disabled so the engine
+    can be shared across the FastMCP worker threads.
+    """
+    url = make_url(database_url)
+    connect_args: dict = {}
+    if url.drivername.startswith("sqlite"):
+        if url.database and url.database != ":memory:":
+            parent = os.path.dirname(url.database)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+        connect_args["check_same_thread"] = False
+    return create_engine(
+        database_url,
+        future=True,
+        pool_pre_ping=True,
+        connect_args=connect_args,
+    )
+
+
+class TokenStore:
+    """Encrypted SQL-backed token store.
+
+    All RNC API tokens are encrypted with Fernet before they
+    are written. The encryption key may be supplied directly
+    (``fernet_key``), pulled from the ``RNC_FERNET_KEY``
+    environment variable, or — for SQLite-on-disk deployments
+    only — auto-generated next to the database file.
+
+    For non-SQLite backends an explicit key is required:
+    auto-generating one would silently break decryption across
+    restarts because the key would not be persisted next to a
+    networked database.
     """
 
     def __init__(
         self,
-        db_path: str = "data/oauth.db",
+        database_url: str = "sqlite:////tmp/oauth.db",
         fernet_key: Optional[bytes] = None,
+        engine: Optional[Engine] = None,
     ):
-        self._db_path = db_path
+        self._database_url = database_url
+        self._engine: Engine = (
+            engine if engine is not None
+            else _build_engine(database_url)
+        )
+        self._dialect = self._engine.dialect.name
         self._pending: dict[str, PendingAuth] = {}
 
-        if fernet_key:
-            self._fernet = Fernet(fernet_key)
-        else:
-            key_path = os.path.join(
-                os.path.dirname(db_path) or ".",
-                ".fernet.key",
+        if fernet_key is None:
+            fernet_key = self._resolve_fernet_key(
+                database_url
             )
-            self._fernet = Fernet(
-                self._load_or_create_key(key_path)
-            )
+        self._fernet = Fernet(fernet_key)
 
-        self._init_db()
+        _metadata.create_all(self._engine)
 
     @staticmethod
-    def _load_or_create_key(key_path: str) -> bytes:
-        """Load existing Fernet key or generate a new one."""
+    def _resolve_fernet_key(database_url: str) -> bytes:
+        """Locate or create the Fernet key.
+
+        Order: ``RNC_FERNET_KEY`` env var → file alongside a
+        SQLite database → ``RuntimeError`` for any other
+        backend (auto-generation would lose the key on the
+        next restart).
+        """
+        env_key = os.getenv("RNC_FERNET_KEY")
+        if env_key:
+            # Allow either bytes-text or str input. Fernet
+            # validates the format on instantiation.
+            return env_key.encode()
+
+        url = make_url(database_url)
+        if not url.drivername.startswith("sqlite"):
+            raise RuntimeError(
+                "RNC_FERNET_KEY must be set when using a "
+                "non-SQLite database backend. Generate one "
+                "with: python -c \"from cryptography.fernet "
+                "import Fernet; print(Fernet.generate_key()"
+                ".decode())\""
+            )
+
+        if url.database in (None, "", ":memory:"):
+            return Fernet.generate_key()
+
+        key_dir = os.path.dirname(url.database) or "."
+        key_path = os.path.join(key_dir, ".fernet.key")
         if os.path.exists(key_path):
             with open(key_path, "rb") as f:
                 return f.read()
         key = Fernet.generate_key()
-        os.makedirs(
-            os.path.dirname(key_path) or ".", exist_ok=True
-        )
+        os.makedirs(key_dir, exist_ok=True)
         fd = os.open(
-            key_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+            key_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
         )
         try:
             os.write(fd, key)
@@ -108,85 +246,86 @@ class TokenStore:
             os.close(fd)
         return key
 
-    def _init_db(self):
-        os.makedirs(
-            os.path.dirname(self._db_path) or ".",
-            exist_ok=True,
-        )
-        conn = sqlite3.connect(self._db_path)
-        try:
-            conn.executescript("""
-                CREATE TABLE IF NOT EXISTS clients (
-                    client_id TEXT PRIMARY KEY,
-                    data TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS auth_codes (
-                    code TEXT PRIMARY KEY,
-                    client_id TEXT NOT NULL,
-                    scopes TEXT NOT NULL,
-                    expires_at REAL NOT NULL,
-                    code_challenge TEXT NOT NULL,
-                    redirect_uri TEXT NOT NULL,
-                    redirect_uri_explicit INTEGER NOT NULL,
-                    rnc_token BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS access_tokens (
-                    token TEXT PRIMARY KEY,
-                    client_id TEXT NOT NULL,
-                    scopes TEXT NOT NULL,
-                    expires_at REAL,
-                    rnc_token BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS refresh_tokens (
-                    token TEXT PRIMARY KEY,
-                    client_id TEXT NOT NULL,
-                    scopes TEXT NOT NULL,
-                    expires_at REAL,
-                    rnc_token BLOB NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS token_pairs (
-                    access_token TEXT NOT NULL,
-                    refresh_token TEXT NOT NULL,
-                    PRIMARY KEY (access_token, refresh_token)
-                );
-            """)
-        finally:
-            conn.close()
-
-    def _conn(self) -> sqlite3.Connection:
-        return sqlite3.connect(self._db_path)
-
     def encrypt_rnc_token(self, rnc_token: str) -> bytes:
         return self._fernet.encrypt(rnc_token.encode())
 
     def decrypt_rnc_token(self, encrypted: bytes) -> str:
         return self._fernet.decrypt(encrypted).decode()
 
+    # --- Generic upsert ---
+
+    def _upsert(
+        self,
+        conn,
+        table: Table,
+        pk_columns: list,
+        values: dict,
+    ) -> None:
+        """Backend-agnostic INSERT-or-REPLACE."""
+        pk_names = {c.name for c in pk_columns}
+        update_set = {
+            k: v for k, v in values.items()
+            if k not in pk_names
+        }
+        if self._dialect == "postgresql":
+            stmt = pg_insert(table).values(**values)
+            if update_set:
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=pk_columns,
+                    set_=update_set,
+                )
+            else:
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=pk_columns,
+                )
+            conn.execute(stmt)
+            return
+        if self._dialect == "sqlite":
+            stmt = sqlite_insert(table).values(**values)
+            if update_set:
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=pk_columns,
+                    set_=update_set,
+                )
+            else:
+                stmt = stmt.on_conflict_do_nothing(
+                    index_elements=pk_columns,
+                )
+            conn.execute(stmt)
+            return
+        # Generic fallback: delete by PK, then insert.
+        where_clause = None
+        for col in pk_columns:
+            cond = col == values[col.name]
+            where_clause = (
+                cond if where_clause is None
+                else where_clause & cond
+            )
+        conn.execute(delete(table).where(where_clause))
+        conn.execute(insert(table).values(**values))
+
     # --- Clients ---
 
     def save_client(self, client_id: str, data: dict):
-        conn = self._conn()
-        try:
-            conn.execute(
-                "INSERT OR REPLACE INTO clients "
-                "(client_id, data) VALUES (?, ?)",
-                (client_id, json.dumps(data)),
+        with self._engine.begin() as conn:
+            self._upsert(
+                conn,
+                _clients,
+                [_clients.c.client_id],
+                {
+                    "client_id": client_id,
+                    "data": json.dumps(data),
+                },
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     def get_client(self, client_id: str) -> Optional[dict]:
-        conn = self._conn()
-        try:
+        with self._engine.connect() as conn:
             row = conn.execute(
-                "SELECT data FROM clients "
-                "WHERE client_id = ?",
-                (client_id,),
+                select(_clients.c.data).where(
+                    _clients.c.client_id == client_id
+                )
             ).fetchone()
             return json.loads(row[0]) if row else None
-        finally:
-            conn.close()
 
     # --- Pending authorizations (in-memory only) ---
 
@@ -235,260 +374,233 @@ class TokenStore:
     # --- Authorization codes ---
 
     def save_auth_code(self, record: AuthCodeRecord):
-        conn = self._conn()
-        try:
-            conn.execute(
-                "INSERT INTO auth_codes "
-                "(code, client_id, scopes, expires_at, "
-                "code_challenge, redirect_uri, "
-                "redirect_uri_explicit, rnc_token) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    record.code,
-                    record.client_id,
-                    json.dumps(record.scopes),
-                    record.expires_at,
-                    record.code_challenge,
-                    record.redirect_uri,
-                    int(
+        with self._engine.begin() as conn:
+            self._upsert(
+                conn,
+                _auth_codes,
+                [_auth_codes.c.code],
+                {
+                    "code": record.code,
+                    "client_id": record.client_id,
+                    "scopes": json.dumps(record.scopes),
+                    "expires_at": record.expires_at,
+                    "code_challenge": record.code_challenge,
+                    "redirect_uri": record.redirect_uri,
+                    "redirect_uri_explicit": int(
                         record.redirect_uri_provided_explicitly
                     ),
-                    record.rnc_token_encrypted,
-                ),
+                    "rnc_token": (
+                        record.rnc_token_encrypted
+                    ),
+                },
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     def get_auth_code(
         self, code: str
     ) -> Optional[AuthCodeRecord]:
-        conn = self._conn()
-        try:
+        with self._engine.begin() as conn:
             row = conn.execute(
-                "SELECT code, client_id, scopes, "
-                "expires_at, code_challenge, redirect_uri, "
-                "redirect_uri_explicit, rnc_token "
-                "FROM auth_codes WHERE code = ?",
-                (code,),
+                select(_auth_codes).where(
+                    _auth_codes.c.code == code
+                )
             ).fetchone()
             if not row:
                 return None
-            if row[3] < time.time():
+            if row.expires_at < time.time():
                 conn.execute(
-                    "DELETE FROM auth_codes "
-                    "WHERE code = ?",
-                    (code,),
+                    delete(_auth_codes).where(
+                        _auth_codes.c.code == code
+                    )
                 )
-                conn.commit()
                 return None
             return AuthCodeRecord(
-                code=row[0],
-                client_id=row[1],
-                scopes=json.loads(row[2]),
-                expires_at=row[3],
-                code_challenge=row[4],
-                redirect_uri=row[5],
+                code=row.code,
+                client_id=row.client_id,
+                scopes=json.loads(row.scopes),
+                expires_at=row.expires_at,
+                code_challenge=row.code_challenge,
+                redirect_uri=row.redirect_uri,
                 redirect_uri_provided_explicitly=bool(
-                    row[6]
+                    row.redirect_uri_explicit
                 ),
-                rnc_token_encrypted=row[7],
+                rnc_token_encrypted=bytes(row.rnc_token),
             )
-        finally:
-            conn.close()
 
     def delete_auth_code(self, code: str):
-        conn = self._conn()
-        try:
+        with self._engine.begin() as conn:
             conn.execute(
-                "DELETE FROM auth_codes WHERE code = ?",
-                (code,),
+                delete(_auth_codes).where(
+                    _auth_codes.c.code == code
+                )
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     # --- Access tokens ---
 
-    def save_access_token(
-        self, record: TokenRecord
-    ):
-        conn = self._conn()
-        try:
-            conn.execute(
-                "INSERT OR REPLACE INTO access_tokens "
-                "(token, client_id, scopes, expires_at, "
-                "rnc_token) VALUES (?, ?, ?, ?, ?)",
-                (
-                    record.token,
-                    record.client_id,
-                    json.dumps(record.scopes),
-                    record.expires_at,
-                    record.rnc_token_encrypted,
-                ),
+    def save_access_token(self, record: TokenRecord):
+        with self._engine.begin() as conn:
+            self._upsert(
+                conn,
+                _access_tokens,
+                [_access_tokens.c.token],
+                {
+                    "token": record.token,
+                    "client_id": record.client_id,
+                    "scopes": json.dumps(record.scopes),
+                    "expires_at": record.expires_at,
+                    "rnc_token": (
+                        record.rnc_token_encrypted
+                    ),
+                },
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     def get_access_token(
         self, token: str
     ) -> Optional[TokenRecord]:
-        conn = self._conn()
-        try:
+        with self._engine.begin() as conn:
             row = conn.execute(
-                "SELECT token, client_id, scopes, "
-                "expires_at, rnc_token "
-                "FROM access_tokens WHERE token = ?",
-                (token,),
+                select(_access_tokens).where(
+                    _access_tokens.c.token == token
+                )
             ).fetchone()
             if not row:
                 return None
-            if row[3] and row[3] < time.time():
-                self._delete_access_token_conn(
-                    conn, row[0]
-                )
-                conn.commit()
+            if (
+                row.expires_at is not None
+                and row.expires_at < time.time()
+            ):
+                self._delete_access_token(conn, row.token)
                 return None
             return TokenRecord(
-                token=row[0],
-                client_id=row[1],
-                scopes=json.loads(row[2]),
-                expires_at=row[3],
-                rnc_token_encrypted=row[4],
+                token=row.token,
+                client_id=row.client_id,
+                scopes=json.loads(row.scopes),
+                expires_at=(
+                    int(row.expires_at)
+                    if row.expires_at is not None
+                    else None
+                ),
+                rnc_token_encrypted=bytes(row.rnc_token),
             )
-        finally:
-            conn.close()
 
     # --- Refresh tokens ---
 
-    def save_refresh_token(
-        self, record: TokenRecord
-    ):
-        conn = self._conn()
-        try:
-            conn.execute(
-                "INSERT OR REPLACE INTO refresh_tokens "
-                "(token, client_id, scopes, expires_at, "
-                "rnc_token) VALUES (?, ?, ?, ?, ?)",
-                (
-                    record.token,
-                    record.client_id,
-                    json.dumps(record.scopes),
-                    record.expires_at,
-                    record.rnc_token_encrypted,
-                ),
+    def save_refresh_token(self, record: TokenRecord):
+        with self._engine.begin() as conn:
+            self._upsert(
+                conn,
+                _refresh_tokens,
+                [_refresh_tokens.c.token],
+                {
+                    "token": record.token,
+                    "client_id": record.client_id,
+                    "scopes": json.dumps(record.scopes),
+                    "expires_at": record.expires_at,
+                    "rnc_token": (
+                        record.rnc_token_encrypted
+                    ),
+                },
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     def get_refresh_token(
         self, token: str
     ) -> Optional[TokenRecord]:
-        conn = self._conn()
-        try:
+        with self._engine.begin() as conn:
             row = conn.execute(
-                "SELECT token, client_id, scopes, "
-                "expires_at, rnc_token "
-                "FROM refresh_tokens WHERE token = ?",
-                (token,),
+                select(_refresh_tokens).where(
+                    _refresh_tokens.c.token == token
+                )
             ).fetchone()
             if not row:
                 return None
-            if row[3] and row[3] < time.time():
-                self._delete_refresh_token_conn(
-                    conn, row[0]
-                )
-                conn.commit()
+            if (
+                row.expires_at is not None
+                and row.expires_at < time.time()
+            ):
+                self._delete_refresh_token(conn, row.token)
                 return None
             return TokenRecord(
-                token=row[0],
-                client_id=row[1],
-                scopes=json.loads(row[2]),
-                expires_at=row[3],
-                rnc_token_encrypted=row[4],
+                token=row.token,
+                client_id=row.client_id,
+                scopes=json.loads(row.scopes),
+                expires_at=(
+                    int(row.expires_at)
+                    if row.expires_at is not None
+                    else None
+                ),
+                rnc_token_encrypted=bytes(row.rnc_token),
             )
-        finally:
-            conn.close()
 
     # --- Token pairs ---
 
     def save_token_pair(
         self, access_token: str, refresh_token: str
     ):
-        conn = self._conn()
-        try:
-            conn.execute(
-                "INSERT OR REPLACE INTO token_pairs "
-                "(access_token, refresh_token) "
-                "VALUES (?, ?)",
-                (access_token, refresh_token),
+        with self._engine.begin() as conn:
+            self._upsert(
+                conn,
+                _token_pairs,
+                [
+                    _token_pairs.c.access_token,
+                    _token_pairs.c.refresh_token,
+                ],
+                {
+                    "access_token": access_token,
+                    "refresh_token": refresh_token,
+                },
             )
-            conn.commit()
-        finally:
-            conn.close()
 
     # --- Revocation ---
 
     def revoke_access_token(self, token: str):
-        conn = self._conn()
-        try:
-            # Find and delete associated refresh token
+        with self._engine.begin() as conn:
             row = conn.execute(
-                "SELECT refresh_token FROM token_pairs "
-                "WHERE access_token = ?",
-                (token,),
+                select(
+                    _token_pairs.c.refresh_token
+                ).where(
+                    _token_pairs.c.access_token == token
+                )
             ).fetchone()
             if row:
-                self._delete_refresh_token_conn(
-                    conn, row[0]
+                self._delete_refresh_token(
+                    conn, row.refresh_token
                 )
-            self._delete_access_token_conn(conn, token)
-            conn.commit()
-        finally:
-            conn.close()
+            self._delete_access_token(conn, token)
 
     def revoke_refresh_token(self, token: str):
-        conn = self._conn()
-        try:
-            # Find and delete associated access token
+        with self._engine.begin() as conn:
             row = conn.execute(
-                "SELECT access_token FROM token_pairs "
-                "WHERE refresh_token = ?",
-                (token,),
+                select(
+                    _token_pairs.c.access_token
+                ).where(
+                    _token_pairs.c.refresh_token == token
+                )
             ).fetchone()
             if row:
-                self._delete_access_token_conn(
-                    conn, row[0]
+                self._delete_access_token(
+                    conn, row.access_token
                 )
-            self._delete_refresh_token_conn(conn, token)
-            conn.commit()
-        finally:
-            conn.close()
+            self._delete_refresh_token(conn, token)
 
-    def _delete_access_token_conn(
-        self, conn: sqlite3.Connection, token: str
-    ):
+    def _delete_access_token(self, conn, token: str):
         conn.execute(
-            "DELETE FROM access_tokens WHERE token = ?",
-            (token,),
+            delete(_access_tokens).where(
+                _access_tokens.c.token == token
+            )
         )
         conn.execute(
-            "DELETE FROM token_pairs "
-            "WHERE access_token = ?",
-            (token,),
+            delete(_token_pairs).where(
+                _token_pairs.c.access_token == token
+            )
         )
 
-    def _delete_refresh_token_conn(
-        self, conn: sqlite3.Connection, token: str
-    ):
+    def _delete_refresh_token(self, conn, token: str):
         conn.execute(
-            "DELETE FROM refresh_tokens WHERE token = ?",
-            (token,),
+            delete(_refresh_tokens).where(
+                _refresh_tokens.c.token == token
+            )
         )
         conn.execute(
-            "DELETE FROM token_pairs "
-            "WHERE refresh_token = ?",
-            (token,),
+            delete(_token_pairs).where(
+                _token_pairs.c.refresh_token == token
+            )
         )

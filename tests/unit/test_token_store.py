@@ -20,9 +20,10 @@ def fernet_key():
 
 @pytest.fixture
 def store(tmp_path, fernet_key):
-    db_path = str(tmp_path / "test_oauth.db")
+    db_path = tmp_path / "test_oauth.db"
     return TokenStore(
-        db_path=db_path, fernet_key=fernet_key
+        database_url=f"sqlite:///{db_path}",
+        fernet_key=fernet_key,
     )
 
 
@@ -46,12 +47,14 @@ class TestTokenStoreEncryption:
         enc2 = store.encrypt_rnc_token(token)
         assert enc1 != enc2
 
-    def test_key_persistence(self, tmp_path):
+    def test_key_persistence(self, tmp_path, monkeypatch):
         """Fernet key is persisted to disk and reused."""
-        db_path = str(tmp_path / "persist.db")
-        store1 = TokenStore(db_path=db_path)
+        monkeypatch.delenv("RNC_FERNET_KEY", raising=False)
+        db_path = tmp_path / "persist.db"
+        url = f"sqlite:///{db_path}"
+        store1 = TokenStore(database_url=url)
         encrypted = store1.encrypt_rnc_token("secret")
-        store2 = TokenStore(db_path=db_path)
+        store2 = TokenStore(database_url=url)
         assert store2.decrypt_rnc_token(encrypted) == (
             "secret"
         )
@@ -299,9 +302,10 @@ class TestTokenStorePersistence:
     def test_data_survives_restart(
         self, tmp_path, fernet_key
     ):
-        db_path = str(tmp_path / "persist.db")
+        db_path = tmp_path / "persist.db"
+        url = f"sqlite:///{db_path}"
         store1 = TokenStore(
-            db_path=db_path, fernet_key=fernet_key
+            database_url=url, fernet_key=fernet_key
         )
         store1.save_client("c1", {"client_id": "c1"})
         record = TokenRecord(
@@ -317,7 +321,7 @@ class TestTokenStorePersistence:
 
         # New store instance, same DB + key
         store2 = TokenStore(
-            db_path=db_path, fernet_key=fernet_key
+            database_url=url, fernet_key=fernet_key
         )
         assert store2.get_client("c1") is not None
         result = store2.get_access_token("at_persist")
@@ -328,3 +332,66 @@ class TestTokenStorePersistence:
             )
             == "secret"
         )
+
+
+@pytest.mark.unit
+class TestTokenStoreBackendSelection:
+    """Tests for connection-string-driven backend setup."""
+
+    def test_sqlite_url_creates_parent_dir(
+        self, tmp_path, fernet_key
+    ):
+        """A SQLite URL pointing into a missing directory
+        triggers directory creation rather than failing."""
+        nested = tmp_path / "a" / "b" / "c" / "oauth.db"
+        TokenStore(
+            database_url=f"sqlite:///{nested}",
+            fernet_key=fernet_key,
+        )
+        assert nested.parent.is_dir()
+
+    def test_in_memory_sqlite_works(self, fernet_key):
+        """Pure-memory SQLite URL is supported (handy in
+        tests and ephemeral-environment smoke runs)."""
+        store = TokenStore(
+            database_url="sqlite:///:memory:",
+            fernet_key=fernet_key,
+        )
+        store.save_client("c1", {"client_id": "c1"})
+        assert store.get_client("c1") == {"client_id": "c1"}
+
+    def test_fernet_key_from_env(
+        self, tmp_path, monkeypatch
+    ):
+        """RNC_FERNET_KEY is honored when no explicit key
+        is passed."""
+        key = Fernet.generate_key()
+        monkeypatch.setenv(
+            "RNC_FERNET_KEY", key.decode()
+        )
+        url = f"sqlite:///{tmp_path / 'env.db'}"
+        store = TokenStore(database_url=url)
+        # Round-trip with an explicit-key store using the
+        # same key proves the env var was used.
+        other = TokenStore(
+            database_url=url, fernet_key=key
+        )
+        assert other.decrypt_rnc_token(
+            store.encrypt_rnc_token("secret")
+        ) == "secret"
+
+    def test_non_sqlite_requires_fernet_key(
+        self, monkeypatch
+    ):
+        """Non-SQLite backends without a key would silently
+        lose every token on the next restart, so the store
+        refuses to start."""
+        monkeypatch.delenv(
+            "RNC_FERNET_KEY", raising=False
+        )
+        with pytest.raises(RuntimeError, match="FERNET"):
+            TokenStore(
+                database_url=(
+                    "postgresql://u:p@host:5432/db"
+                ),
+            )

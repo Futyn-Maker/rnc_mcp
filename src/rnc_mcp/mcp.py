@@ -24,7 +24,9 @@ from rnc_mcp.auth.oauth_provider import RNCOAuthProvider
 validator = RNCTokenValidator(
     cache_ttl=Config.RNC_AUTH_CACHE_TTL
 )
-token_store = TokenStore(db_path=Config.RNC_OAUTH_DB_PATH)
+token_store = TokenStore(
+    database_url=Config.get_database_url()
+)
 auth = RNCOAuthProvider(
     store=token_store,
     rnc_validator=validator,

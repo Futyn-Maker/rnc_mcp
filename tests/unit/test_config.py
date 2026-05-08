@@ -7,6 +7,47 @@ from rnc_mcp.exceptions import RNCConfigError
 
 
 @pytest.mark.unit
+class TestConfigDatabaseUrl:
+    """Tests for the database connection URL resolver."""
+
+    def test_explicit_url_wins(self, monkeypatch):
+        monkeypatch.setenv(
+            "RNC_DATABASE_URL",
+            "postgresql://u:p@h/db",
+        )
+        monkeypatch.setenv(
+            "RNC_OAUTH_DB_PATH", "/should/be/ignored.db"
+        )
+        assert Config.get_database_url() == (
+            "postgresql://u:p@h/db"
+        )
+
+    def test_legacy_path_promoted_to_sqlite_url(
+        self, monkeypatch
+    ):
+        monkeypatch.delenv(
+            "RNC_DATABASE_URL", raising=False
+        )
+        monkeypatch.setenv(
+            "RNC_OAUTH_DB_PATH", "/var/lib/rnc/oauth.db"
+        )
+        assert Config.get_database_url() == (
+            "sqlite:////var/lib/rnc/oauth.db"
+        )
+
+    def test_default_when_unset(self, monkeypatch):
+        monkeypatch.delenv(
+            "RNC_DATABASE_URL", raising=False
+        )
+        monkeypatch.delenv(
+            "RNC_OAUTH_DB_PATH", raising=False
+        )
+        assert Config.get_database_url() == (
+            "sqlite:////tmp/oauth.db"
+        )
+
+
+@pytest.mark.unit
 class TestConfig:
     """Tests for Config singleton class."""
 

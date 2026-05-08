@@ -10,7 +10,7 @@ The server supports per-user authentication via two paths:
 1. **OAuth2 flow** (for web clients like Claude.ai): the user enters their RNC API token in a login form, the server issues OAuth access/refresh tokens mapped to that RNC token.
 2. **Direct bearer** (for scripts, IDEs, programmatic access): the client sends a raw RNC API token as a bearer token.
 
-Both paths validate tokens against the RNC API's `/auth/check-authenticated/` endpoint with TTL caching. OAuth data (clients, tokens) is persisted in an encrypted SQLite database that survives server restarts.
+Both paths validate tokens against the RNC API's `/auth/check-authenticated/` endpoint with TTL caching. OAuth data (clients, tokens) is persisted in an encrypted SQL database (any SQLAlchemy-supported backend — SQLite, PostgreSQL, MySQL, …) that survives server restarts. The backend is selected by `RNC_DATABASE_URL`.
 
 ## Commands
 
@@ -44,7 +44,12 @@ Optional variables:
 - `RNC_PAGE_DELAY` — delay in seconds between page requests (default: `0.5`)
 - `RNC_MAX_RETRIES` — consecutive failures before aborting multi-page fetch (default: `3`)
 - `RNC_AUTH_CACHE_TTL` — how long validated tokens are cached, in seconds (default: `300`)
-- `RNC_OAUTH_DB_PATH` — path to the SQLite database for OAuth data (default: `/tmp/oauth.db`)
+- `RNC_DATABASE_URL` — SQLAlchemy connection URL for the OAuth store (default: `sqlite:////tmp/oauth.db`). Examples:
+  - `sqlite:////var/lib/rnc_mcp/oauth.db` — persistent SQLite on a VPS
+  - `postgresql://user:pass@host:5432/db` — self-hosted PostgreSQL
+  - `postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:5432/postgres` — Supabase **Session Pooler** (IPv4; required for FastMCP Cloud / any host without IPv6, since the direct `db.<ref>.supabase.co` URL is IPv6-only on the free tier)
+- `RNC_FERNET_KEY` — base64 Fernet key used to encrypt RNC tokens at rest. **Required** for non-SQLite backends (otherwise stored tokens become un-decryptable across restarts). Optional for SQLite — auto-generated and stored at `<db_dir>/.fernet.key` if absent. Generate one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+- `RNC_OAUTH_DB_PATH` *(legacy)* — interpreted as a SQLite file path when `RNC_DATABASE_URL` is unset. Prefer `RNC_DATABASE_URL`.
 - `RNC_OAUTH_BASE_URL` — public base URL of the server, used for OAuth metadata (default: `http://127.0.0.1:8000`)
 
 ### STDIO transport (local usage)
@@ -65,7 +70,7 @@ src/rnc_mcp/
 │   ├── rnc_validator.py # RNCTokenValidator: validates tokens via RNC API with TTL cache
 │   ├── rnc_provider.py  # RNCAuthProvider: FastMCP TokenVerifier subclass (direct bearer only)
 │   ├── oauth_provider.py # RNCOAuthProvider: full OAuth2 + direct bearer dual auth
-│   ├── token_store.py   # Encrypted SQLite store for OAuth tokens, clients, RNC token mappings
+│   ├── token_store.py   # Encrypted SQLAlchemy-backed token store (SQLite/Postgres/...) for OAuth tokens, clients, RNC token mappings
 │   └── login_page.py    # HTML login form for the OAuth authorization flow
 ├── clients/
 │   ├── base.py         # CorpusClient abstract base class
@@ -165,8 +170,8 @@ _get_user_token()
 ### Key design decisions
 
 - **Dual auth**: OAuth2 tokens and raw RNC bearer tokens are both accepted. `load_access_token()` checks the SQLite store first, then falls back to `RNCTokenValidator`.
-- **Encrypted storage**: RNC API tokens are encrypted with Fernet (AES-128-CBC) before storage in SQLite. The encryption key is auto-generated on first run and stored at `data/.fernet.key` (permissions 0600).
-- **SQLite persistence**: OAuth clients, access/refresh tokens, and their RNC token mappings survive server restarts. No external database required.
+- **Encrypted storage**: RNC API tokens are encrypted with Fernet (AES-128-CBC) before being written to the database. The key comes from `RNC_FERNET_KEY` (preferred). For SQLite-on-disk deployments, if no env key is set the key is auto-generated and stored at `<db_dir>/.fernet.key` (permissions 0600). Non-SQLite backends require an explicit `RNC_FERNET_KEY` — the store refuses to start without it, since silently auto-generating a key would lose every token on the next restart.
+- **Pluggable persistence**: any SQLAlchemy-supported backend works (SQLite, PostgreSQL, MySQL, …). Schema and queries are dialect-agnostic; the only dialect-aware code is the upsert helper, which uses native `ON CONFLICT` for SQLite/PostgreSQL and falls back to delete-then-insert for everything else. No external database is required for self-hosted use.
 - **User token isolation**: each user's RNC token is stored separately, encrypted, and only decryptable by this server instance.
 - **Abstract base classes**: `TokenValidator` (domain interface) is decoupled from the auth providers, following the same pattern as `CorpusClient`/`RNCClient`.
 

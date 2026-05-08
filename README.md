@@ -6,7 +6,7 @@ The server abstracts the complexity of the raw RNC API, providing a streamlined 
 
 ## Features
 
-* **Per-User Authentication:** Supports two auth paths — **OAuth2** (for web clients like Claude.ai that only support OAuth) and **direct bearer tokens** (for scripts, IDEs, programmatic access). In the OAuth2 flow, the user enters their RNC API token in a login form; the server issues OAuth tokens mapped to it. All auth data is encrypted and persisted in SQLite.
+* **Per-User Authentication:** Supports two auth paths — **OAuth2** (for web clients like Claude.ai that only support OAuth) and **direct bearer tokens** (for scripts, IDEs, programmatic access). In the OAuth2 flow, the user enters their RNC API token in a login form; the server issues OAuth tokens mapped to it. All auth data is encrypted (Fernet) and persisted in any SQLAlchemy-supported database — local SQLite for self-hosted deployments, PostgreSQL/Supabase/etc. when ephemeral file systems (e.g. FastMCP Cloud) make file-based storage impractical.
 * **Zero-Code Integration:** Connects seamlessly to any MCP-compliant client (Claude Web or Desktop, IDEs, etc.).
 * **Concordance Search:** Powerful querying capabilities including lemmas, exact word forms, grammar tags, semantic tags, and syntactic roles.
 * **Multi-Page Collection:** Automatically fetch hundreds of examples across multiple pages with a single tool call by setting `max_examples`, with built-in retry logic and rate-limit protection.
@@ -35,7 +35,9 @@ No `RNC_API_TOKEN` is required on the server side. Users authenticate via OAuth2
 | `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
 | `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
 | `RNC_AUTH_CACHE_TTL` | No | `300` | How long validated tokens are cached, in seconds |
-| `RNC_OAUTH_DB_PATH` | No | `/tmp/oauth.db` | Path to the SQLite database for OAuth data |
+| `RNC_DATABASE_URL` | No | `sqlite:////tmp/oauth.db` | SQLAlchemy connection URL for the OAuth store. Use a `postgresql://...` URL (e.g. Supabase **Session Pooler**: `postgresql://postgres.<ref>:<pass>@aws-0-<region>.pooler.supabase.com:5432/postgres`) for cloud deployments where the file system is ephemeral. |
+| `RNC_FERNET_KEY` | Required for non-SQLite backends | auto-generated next to the SQLite DB | Base64 Fernet key for encrypting RNC tokens at rest. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `RNC_OAUTH_DB_PATH` | No (legacy) | — | Interpreted as a SQLite file path when `RNC_DATABASE_URL` is unset. Prefer `RNC_DATABASE_URL`. |
 | `RNC_OAUTH_BASE_URL` | No | `http://127.0.0.1:8000` | Public base URL for OAuth metadata endpoints |
 
 #### STDIO transport (local usage)
@@ -48,7 +50,27 @@ When using STDIO transport (e.g., via IDE integration), there is no auth mechani
 | `RNC_PAGE_DELAY` | No | `0.5` | Delay in seconds between page requests during multi-page collection |
 | `RNC_MAX_RETRIES` | No | `3` | Max consecutive failures before aborting multi-page fetch |
 
-### 3. Running the Server
+### 3. Generate a Fernet Encryption Key
+
+The server encrypts every stored RNC API token at rest with [Fernet](https://cryptography.io/en/latest/fernet/) (AES-128 in CBC mode + HMAC-SHA256). The key is the only thing protecting tokens in your database, so it lives **outside** the database — in an env var.
+
+Generate one:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Add the output to your `.env`:
+
+```bash
+RNC_FERNET_KEY=<paste the generated key here>
+```
+
+> **When is this required?**
+> - **PostgreSQL / MySQL / any networked DB:** **always required**. Without a stable key the server refuses to start, because auto-generating one would silently leave you with un-decryptable tokens after the next restart.
+> - **SQLite:** optional. If unset, the server auto-generates a key once and stores it next to the database file as `.fernet.key` (mode `0600`). Fine for self-hosted VPS use; **not** fine for FastMCP Cloud or any host with an ephemeral file system, where you should set the env var so the key survives restarts.
+
+### 4. Running the Server
 
 First, install the dependencies:
 
